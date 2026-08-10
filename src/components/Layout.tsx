@@ -7,12 +7,14 @@ const BASE_NAV_LINKS = [
 ];
 
 const ADMIN_NAV_LINKS = [
+  { to: '/employees', label: 'Employees', icon: '🧑‍🌾', roles: ['ADMIN'] },
   { to: '/audit-logs', label: 'Audit Log', icon: '🔍', roles: ['ADMIN', 'MANAGER', 'OPERATIONS_MANAGER'] },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/reports': 'Reports',
+  '/employees': 'Employees',
   '/audit-logs': 'Audit Log',
 };
 

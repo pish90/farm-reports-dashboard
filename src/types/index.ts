@@ -90,3 +90,47 @@ export interface AuditLogPageDto {
   page: number;
   size: number;
 }
+
+export interface EmployeeDto {
+  id: number;
+  farmId: number;
+  farmName: string;
+  lsNumber: string | null;
+  employeeId: string | null;
+  firstName: string;
+  lastName: string | null;
+  fullName: string;
+  phone: string | null;
+  employmentType: 'SALARIED' | 'CASUAL';
+  jobTitle: string | null;
+  departmentName: string | null;
+  startDate: string | null;
+  dateOfBirth: string | null;
+  nationalId: string | null;
+  gender: string | null;
+  age: number | null;
+  status: string;
+  defaultDailyRate: number | null;
+  photoBase64: string | null;
+  photoMimeType: string | null;
+}
+
+export interface ImportRowError {
+  row: number;
+  rowSummary: string;
+  message: string;
+}
+
+export interface ImportResult {
+  success: boolean;
+  totalRows: number;
+  importedCount: number;
+  errors: ImportRowError[];
+}
+
+export interface EmployeeCsvImportResult {
+  success: boolean;
+  totalRows: number;
+  importedCount: number;
+  errors: ImportRowError[];
+}
