@@ -134,3 +134,142 @@ export interface EmployeeCsvImportResult {
   importedCount: number;
   errors: ImportRowError[];
 }
+
+// ── Payroll ──────────────────────────────────────────────────────────────
+
+export interface PayrollRecordDto {
+  id: number | null;
+  employeeId: number;
+  employeeName: string;
+  employeeCode: string | null;
+  lsNumber: string | null;
+  salaryRate: number | null;
+  daysWorked: number | null;
+  grossSalary: number | null;
+  loans: number | null;
+  amountPaid: number | null;
+  amountRemaining: number | null;
+  notes: string | null;
+}
+
+export interface PayrollEntryRequest {
+  employeeId: number;
+  salaryRate: number | null;
+  daysWorked: number | null;
+  grossSalary: number | null;
+  loans: number | null;
+  amountPaid: number | null;
+  amountRemaining: number | null;
+  notes: string | null;
+}
+
+export interface PayrollSummaryDto {
+  farmId: number;
+  year: number;
+  month: number;
+  totalGross: number;
+  totalLoans: number;
+  totalPaid: number;
+  totalRemaining: number;
+}
+
+// ── Casual labour ────────────────────────────────────────────────────────
+
+export interface CasualLabourerDto {
+  id: number;
+  lsNumber: string | null;
+  employeeId: string | null;
+  firstName: string;
+  lastName: string | null;
+  name: string;
+  phone: string | null;
+  photoBase64: string | null;
+  photoMimeType: string | null;
+  jobTitle: string | null;
+  departmentName: string | null;
+}
+
+export interface CasualLabourerRequest {
+  firstName: string;
+  lastName: string | null;
+  phone: string | null;
+  jobTitle: string | null;
+  departmentId: number | null;
+}
+
+export interface CasualWorkEntryDto {
+  id: number;
+  casualLabourerId: number;
+  labourerName: string;
+  rateOverride: number | null;
+  effectiveRate: number;
+}
+
+export interface CasualWorkSessionDto {
+  id: number;
+  sessionDate: string;
+  activity: string;
+  defaultDailyRate: number;
+  entries: CasualWorkEntryDto[];
+}
+
+export interface WorkSessionEntryRequest {
+  casualLabourerId: number;
+  rateOverride: number | null;
+}
+
+export interface CreateWorkSessionRequest {
+  sessionDate: string;
+  activity: string;
+  defaultDailyRate: number;
+  entries: WorkSessionEntryRequest[];
+}
+
+export interface CasualLabourerPaymentDto {
+  id: number;
+  casualLabourerId: number;
+  labourerName: string;
+  paymentDate: string;
+  amount: number;
+  note: string | null;
+  paidBy: string | null;
+  createdAt: string;
+}
+
+export interface CasualLabourerSummaryDto {
+  allTimeEarned: number;
+  allTimePaid: number;
+  outstanding: number;
+  payments: CasualLabourerPaymentDto[];
+}
+
+export interface RecordPaymentRequest {
+  paymentDate: string;
+  amount: number;
+  note: string | null;
+}
+
+export interface CasualPayrollEntryDto {
+  labourerId: number;
+  name: string;
+  phone: string | null;
+  photoBase64: string | null;
+  photoMimeType: string | null;
+  daysPresent: number;
+  monthEarnings: number;
+  allTimePaid: number;
+  outstanding: number;
+}
+
+// ── Farm settings ────────────────────────────────────────────────────────
+
+export interface DepartmentDto {
+  id: number;
+  name: string;
+}
+
+export interface LivestockTypeDto {
+  id: number;
+  category: string;
+  type: string;
+}
