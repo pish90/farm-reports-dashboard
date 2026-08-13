@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react';
-import { getFarmSummaries } from '../api/reports';
-import type { FarmSummaryDto } from '../types';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getFarmEmployees, getMasterEmployeeRegistry } from '../api/employees';
+import { getFarmSummaries, getLiveStatus } from '../api/reports';
+import { useAuth } from '../auth/AuthContext';
+import StatusBadge from '../components/StatusBadge';
+import { formatMoney } from '../lib/format';
+import type { EmployeeDto, FarmLiveStatusDto, FarmSummaryDto } from '../types';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -13,7 +18,12 @@ function formatDate(iso: string | null): string {
   return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function FarmCard({ farm }: { farm: FarmSummaryDto }) {
+function FarmCard({
+  farm, employeeCount,
+}: {
+  farm: FarmSummaryDto;
+  employeeCount?: { active: number; total: number };
+}) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
@@ -34,7 +44,7 @@ function FarmCard({ farm }: { farm: FarmSummaryDto }) {
         <div className="bg-amber-50 rounded-lg p-3">
           <dt className="text-xs text-amber-700 font-medium">Expenses This Month</dt>
           <dd className="text-lg font-bold text-amber-900 mt-0.5">
-            ${farm.totalExpensesThisMonth.toFixed(2)}
+            {formatMoney(farm.totalExpensesThisMonth)}
           </dd>
         </div>
         <div className="col-span-2 bg-gray-50 rounded-lg p-3">
@@ -43,6 +53,14 @@ function FarmCard({ farm }: { farm: FarmSummaryDto }) {
             {farm.reportsThisYear} report{farm.reportsThisYear !== 1 ? 's' : ''}
           </dd>
         </div>
+        {employeeCount && (
+          <div className="col-span-2">
+            <dt className="text-xs text-gray-400">Employees</dt>
+            <dd className="text-sm text-gray-700 mt-0.5">
+              <strong>{employeeCount.active}</strong> active of {employeeCount.total}
+            </dd>
+          </div>
+        )}
         <div className="col-span-2">
           <dt className="text-xs text-gray-400">Last Submitted</dt>
           <dd className="text-sm text-gray-700 mt-0.5">{formatDate(farm.lastSubmittedAt)}</dd>
@@ -52,29 +70,124 @@ function FarmCard({ farm }: { farm: FarmSummaryDto }) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-5">
       <p className="text-sm text-gray-500">{label}</p>
       <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+function LiveStatusTable({ rows }: { rows: FarmLiveStatusDto[] }) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-200">
+        <h3 className="text-sm font-semibold text-gray-700">
+          Live status — {MONTH_NAMES[rows[0]?.month - 1] ?? ''} {rows[0]?.year ?? ''}
+        </h3>
+      </div>
+      {rows.length === 0 ? (
+        <div className="p-10 text-center text-gray-400 text-sm">No farms found.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Farm</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Report</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Active workers</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Attendance days</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Livestock</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Milk</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Expense rows</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Expense total</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((f) => (
+                <tr key={f.farmId} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{f.farmName}</td>
+                  <td className="px-4 py-3"><StatusBadge status={f.reportStatus} /></td>
+                  <td className="px-4 py-3 text-gray-700">{f.activeWorkers}</td>
+                  <td className="px-4 py-3 text-gray-700">{f.attendanceDaysRecorded}</td>
+                  <td className="px-4 py-3 text-gray-700">{f.livestockEntered ? 'Yes' : 'No'}</td>
+                  <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{f.milkTotalLitres.toFixed(1)} L</td>
+                  <td className="px-4 py-3 text-gray-700">{f.expenseCount}</td>
+                  <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatMoney(f.expenseTotal)}</td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    {f.reportId ? (
+                      <button
+                        onClick={() => navigate(`/reports/${f.reportId}`)}
+                        className="text-green-700 hover:text-green-900 text-xs font-medium"
+                      >
+                        Open
+                      </button>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   const [farms, setFarms] = useState<FarmSummaryDto[]>([]);
+  const [liveStatus, setLiveStatus] = useState<FarmLiveStatusDto[]>([]);
+  const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getFarmSummaries()
-      .then(setFarms)
+    const now = new Date();
+    const employeesRequest: Promise<EmployeeDto[]> = isAdmin
+      ? getMasterEmployeeRegistry()
+      : user?.farmId
+      ? getFarmEmployees(user.farmId)
+      : Promise.resolve([]);
+
+    Promise.all([
+      getFarmSummaries(),
+      getLiveStatus(now.getFullYear(), now.getMonth() + 1),
+      employeesRequest.catch(() => []),
+    ])
+      .then(([farmData, liveStatusData, employeeData]) => {
+        setFarms(farmData);
+        setLiveStatus(liveStatusData);
+        setEmployees(employeeData);
+      })
       .catch(() => setError('Failed to load farm data.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isAdmin, user?.farmId]);
 
   const totalMilk = farms.reduce((sum, f) => sum + f.totalMilkThisMonth, 0);
   const totalExpenses = farms.reduce((sum, f) => sum + f.totalExpensesThisMonth, 0);
+
+  const employeesByFarm = useMemo(() => {
+    const map = new Map<number, { active: number; total: number }>();
+    employees.forEach((e) => {
+      const bucket = map.get(e.farmId) ?? { active: 0, total: 0 };
+      bucket.total += 1;
+      if (e.status === 'ACTIVE') bucket.active += 1;
+      map.set(e.farmId, bucket);
+    });
+    return map;
+  }, [employees]);
+
+  const totalActiveEmployees = employees.filter((e) => e.status === 'ACTIVE').length;
 
   if (loading) {
     return (
@@ -100,15 +213,22 @@ export default function DashboardPage() {
       <p className="text-sm text-gray-500">Overview for {monthName} {now.getFullYear()}</p>
 
       {/* Quick stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label={`Total Milk This Month (all farms)`}
           value={`${totalMilk.toFixed(1)} L`}
         />
         <StatCard
           label={`Total Expenses This Month (all farms)`}
-          value={`$${totalExpenses.toFixed(2)}`}
+          value={formatMoney(totalExpenses)}
         />
+        {employees.length > 0 && (
+          <StatCard
+            label="Employees"
+            value={String(totalActiveEmployees)}
+            sub={`active of ${employees.length} total`}
+          />
+        )}
       </div>
 
       {/* Farm cards */}
@@ -121,11 +241,14 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {farms.map((farm) => (
-              <FarmCard key={farm.farmId} farm={farm} />
+              <FarmCard key={farm.farmId} farm={farm} employeeCount={employeesByFarm.get(farm.farmId)} />
             ))}
           </div>
         )}
       </div>
+
+      {/* Live status */}
+      <LiveStatusTable rows={liveStatus} />
     </div>
   );
 }

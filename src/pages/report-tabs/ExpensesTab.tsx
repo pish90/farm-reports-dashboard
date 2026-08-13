@@ -1,3 +1,4 @@
+import { formatMoney } from '../../lib/format';
 import type { ExpenseRecordDto } from '../../types';
 
 interface Props {
@@ -42,7 +43,7 @@ export default function ExpensesTab({ expenses }: Props) {
               <td className="px-4 py-2 text-gray-800">{e.supplierContractor ?? '—'}</td>
               <td className="px-4 py-2 text-gray-700">{e.receiptNo ?? '—'}</td>
               <td className="px-4 py-2 text-right text-gray-900 font-medium">
-                {Number(e.cost).toFixed(2)}
+                {formatMoney(Number(e.cost))}
               </td>
             </tr>
           ))}
@@ -51,7 +52,7 @@ export default function ExpensesTab({ expenses }: Props) {
           <tr className="bg-gray-100 font-bold text-gray-800">
             <td className="px-4 py-2" colSpan={3}></td>
             <td className="px-4 py-2 text-right">TOTAL</td>
-            <td className="px-4 py-2 text-right">{total.toFixed(2)}</td>
+            <td className="px-4 py-2 text-right">{formatMoney(total)}</td>
           </tr>
         </tfoot>
       </table>

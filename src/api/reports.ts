@@ -1,8 +1,15 @@
 import client from './client';
-import type { FarmSummaryDto, ReportDto } from '../types';
+import type { FarmLiveStatusDto, FarmSummaryDto, ReportDto } from '../types';
 
 export async function getFarmSummaries(): Promise<FarmSummaryDto[]> {
   const res = await client.get<{ data: FarmSummaryDto[] }>('/admin/farms');
+  return res.data.data;
+}
+
+export async function getLiveStatus(year: number, month: number): Promise<FarmLiveStatusDto[]> {
+  const res = await client.get<{ data: FarmLiveStatusDto[] }>('/admin/live-status', {
+    params: { year, month },
+  });
   return res.data.data;
 }
 

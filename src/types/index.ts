@@ -53,6 +53,21 @@ export interface FarmSummaryDto {
   totalExpensesThisMonth: number;
 }
 
+export interface FarmLiveStatusDto {
+  farmId: number;
+  farmName: string;
+  year: number;
+  month: number;
+  reportStatus: 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED';
+  reportId: number | null;
+  activeWorkers: number;
+  attendanceDaysRecorded: number;
+  milkTotalLitres: number;
+  expenseCount: number;
+  expenseTotal: number;
+  livestockEntered: boolean;
+}
+
 export interface AuthUser {
   userId: number;
   farmId: number;

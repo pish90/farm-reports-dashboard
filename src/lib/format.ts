@@ -9,7 +9,7 @@ export function monthName(month: number): string {
 
 export function formatMoney(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `KSh ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function formatDate(iso: string | null | undefined): string {

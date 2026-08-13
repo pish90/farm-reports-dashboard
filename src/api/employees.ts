@@ -9,6 +9,11 @@ export async function getMasterEmployeeRegistry(): Promise<EmployeeDto[]> {
   return res.data.data;
 }
 
+export async function getFarmEmployees(farmId: number): Promise<EmployeeDto[]> {
+  const res = await client.get<{ data: EmployeeDto[] }>(`/farms/${farmId}/employees`);
+  return res.data.data;
+}
+
 export async function createEmployee(farmId: number, req: EmployeeRequest): Promise<EmployeeDto> {
   const res = await client.post<{ data: EmployeeDto }>(`/farms/${farmId}/employees`, req);
   return res.data.data;
