@@ -1,9 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  createEmployee, deleteEmployeePayment, getEmployeeLedger, getEmployeeSummary,
   getMasterEmployeeRegistry, importEmployeePay, importEmployees, importLivestock, importMilk,
+  recordEmployeePayment, updateEmployee,
 } from '../api/employees';
+import { getDepartments } from '../api/farms';
 import { useAuth } from '../auth/AuthContext';
-import type { EmployeeCsvImportResult, EmployeeDto, ImportResult } from '../types';
+import Modal from '../components/Modal';
+import { formatDate, formatMoney, monthName } from '../lib/format';
+import type {
+  DepartmentDto, EmployeeCsvImportResult, EmployeeDto, EmployeeLedgerDto, EmployeeSummaryDto, ImportResult,
+} from '../types';
+
+const selectClass =
+  'border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
+const inputClass =
+  'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
+const primaryBtn = 'px-4 py-2 text-sm rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-40 transition-colors';
+const secondaryBtn = 'px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors';
+const dangerLink = 'text-red-600 hover:text-red-800 text-xs font-medium';
+
+const LEDGER_YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
 
 type ImportKind = 'employees' | 'livestock' | 'milk' | 'employeePay';
 type YearMode = 'none' | 'single' | 'startYearMonth';
@@ -226,6 +244,342 @@ function ImportModal({ onClose, onEmployeesImported }: { onClose: () => void; on
   );
 }
 
+function LedgerSection({ farmId, employeeId }: { farmId: number; employeeId: number }) {
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [ledger, setLedger] = useState<EmployeeLedgerDto | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    getEmployeeLedger(farmId, employeeId, year)
+      .then(setLedger)
+      .catch(() => setLedger(null))
+      .finally(() => setLoading(false));
+  }, [farmId, employeeId, year]);
+
+  return (
+    <div className="pt-2 border-t border-gray-200">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold text-gray-700">Annual Ledger</h4>
+        <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={selectClass}>
+          {LEDGER_YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+      {loading ? (
+        <div className="text-xs text-gray-400 py-4 text-center">Loading…</div>
+      ) : !ledger ? (
+        <div className="text-xs text-gray-400 py-4 text-center">Failed to load ledger</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-xs text-gray-500">Opening balance</div>
+              <div className="text-sm font-bold text-gray-900">{formatMoney(ledger.openingBalance)}</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-xs text-gray-500">Earned this year</div>
+              <div className="text-sm font-bold text-gray-900">{formatMoney(ledger.totalEarned)}</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-xs text-gray-500">Paid this year</div>
+              <div className="text-sm font-bold text-gray-900">{formatMoney(ledger.totalPaid)}</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-xs text-gray-500">Closing balance</div>
+              <div className="text-sm font-bold text-gray-900">{formatMoney(ledger.closingBalance)}</div>
+            </div>
+          </div>
+          <div className="overflow-x-auto border border-gray-200 rounded-lg">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Month</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Earned</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Paid</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Balance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {ledger.months.map((m) => (
+                  <tr key={m.month}>
+                    <td className="px-3 py-2">{monthName(m.month)}</td>
+                    <td className="px-3 py-2">{formatMoney(m.earned)}</td>
+                    <td className="px-3 py-2">{formatMoney(m.paid)}</td>
+                    <td className="px-3 py-2">{formatMoney(m.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PaymentsSection({ farmId, employeeId }: { farmId: number; employeeId: number }) {
+  const [summary, setSummary] = useState<EmployeeSummaryDto | null>(null);
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  function load() {
+    getEmployeeSummary(farmId, employeeId).then(setSummary).catch(() => setSummary(null));
+  }
+
+  useEffect(load, [farmId, employeeId]);
+
+  async function handleRecordPayment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!paymentAmount) return;
+    try {
+      await recordEmployeePayment(farmId, employeeId, {
+        paymentDate, amount: Number(paymentAmount), note: paymentNote || null,
+      });
+      setPaymentAmount('');
+      setPaymentNote('');
+      load();
+    } catch {
+      setError('Failed to record payment.');
+    }
+  }
+
+  async function handleDeletePayment(paymentId: number) {
+    if (!confirm('Delete this payment?')) return;
+    try {
+      await deleteEmployeePayment(farmId, employeeId, paymentId);
+      load();
+    } catch {
+      setError('Failed to delete payment.');
+    }
+  }
+
+  if (!summary) return null;
+
+  return (
+    <div className="pt-2 border-t border-gray-200">
+      <h4 className="text-sm font-semibold text-gray-700 mb-3">Payments</h4>
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-gray-50 rounded-lg p-3">
+          <div className="text-xs text-gray-500">All-time earned</div>
+          <div className="text-sm font-bold text-gray-900">{formatMoney(summary.allTimeEarned)}</div>
+        </div>
+        <div className="bg-gray-50 rounded-lg p-3">
+          <div className="text-xs text-gray-500">All-time paid</div>
+          <div className="text-sm font-bold text-gray-900">{formatMoney(summary.allTimePaid)}</div>
+        </div>
+        <div className="bg-gray-50 rounded-lg p-3">
+          <div className="text-xs text-gray-500">Outstanding</div>
+          <div className="text-sm font-bold text-gray-900">{formatMoney(summary.outstanding)}</div>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto border border-gray-200 rounded-lg mb-3">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="text-left px-3 py-2 font-medium text-gray-600">Date</th>
+              <th className="text-left px-3 py-2 font-medium text-gray-600">Amount</th>
+              <th className="text-left px-3 py-2 font-medium text-gray-600">Note</th>
+              <th className="text-left px-3 py-2 font-medium text-gray-600">Paid by</th>
+              <th className="px-3 py-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {summary.payments.length === 0 ? (
+              <tr><td colSpan={5} className="px-3 py-4 text-center text-gray-400 text-xs">No payments recorded</td></tr>
+            ) : summary.payments.map((p) => (
+              <tr key={p.id}>
+                <td className="px-3 py-2">{formatDate(p.paymentDate)}</td>
+                <td className="px-3 py-2">{formatMoney(p.amount)}</td>
+                <td className="px-3 py-2 text-gray-500">{p.note ?? ''}</td>
+                <td className="px-3 py-2 text-gray-500">{p.paidBy ?? ''}</td>
+                <td className="px-3 py-2 text-right">
+                  <button onClick={() => handleDeletePayment(p.id)} className={dangerLink}>Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {error && <div className="text-sm text-red-600 mb-2">{error}</div>}
+
+      <form onSubmit={handleRecordPayment} className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>Date</label>
+          <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>Amount</label>
+          <input type="number" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required className={inputClass} />
+        </div>
+        <div className="col-span-2">
+          <label className={labelClass}>Note</label>
+          <input value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} className={inputClass} />
+        </div>
+        <div className="col-span-2">
+          <button type="submit" className={secondaryBtn}>Record payment</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function EmployeeModal({
+  farmId, employee, onClose, onSaved,
+}: {
+  farmId: number;
+  employee: EmployeeDto | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isNew = !employee;
+  const [departments, setDepartments] = useState<DepartmentDto[]>([]);
+  const [firstName, setFirstName] = useState(employee?.firstName ?? '');
+  const [lastName, setLastName] = useState(employee?.lastName ?? '');
+  const [phone, setPhone] = useState(employee?.phone ?? '');
+  const [employmentType, setEmploymentType] = useState<'SALARIED' | 'CASUAL'>(employee?.employmentType ?? 'SALARIED');
+  const [jobTitle, setJobTitle] = useState(employee?.jobTitle ?? '');
+  const [departmentId, setDepartmentId] = useState('');
+  const [startDate, setStartDate] = useState(employee?.startDate ?? '');
+  const [dateOfBirth, setDateOfBirth] = useState(employee?.dateOfBirth ?? '');
+  const [nationalId, setNationalId] = useState(employee?.nationalId ?? '');
+  const [gender, setGender] = useState(employee?.gender ?? '');
+  const [defaultDailyRate, setDefaultDailyRate] = useState(employee?.defaultDailyRate?.toString() ?? '');
+  const [status, setStatus] = useState(employee?.status ?? 'ACTIVE');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getDepartments(farmId).then(setDepartments).catch(() => setDepartments([]));
+  }, [farmId]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        firstName,
+        lastName: lastName || null,
+        phone: phone || null,
+        employmentType,
+        jobTitle: jobTitle || null,
+        departmentId: departmentId ? Number(departmentId) : null,
+        startDate: startDate || null,
+        dateOfBirth: dateOfBirth || null,
+        nationalId: nationalId || null,
+        gender: gender || null,
+        defaultDailyRate: defaultDailyRate ? Number(defaultDailyRate) : null,
+        photoBase64: null,
+        photoMimeType: null,
+        status,
+      };
+      if (isNew) await createEmployee(farmId, payload);
+      else await updateEmployee(farmId, employee.id, payload);
+      onSaved();
+    } catch {
+      setError('Failed to save employee.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title={isNew ? 'Add employee' : employee.fullName} onClose={onClose} maxWidth="max-w-3xl">
+      {employee?.lsNumber && <p className="text-xs text-gray-400 font-mono -mt-2">{employee.lsNumber}</p>}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>First name</label>
+            <input value={firstName} onChange={(e) => setFirstName(e.target.value)} required className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Last name</label>
+            <input value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Phone</label>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Employment type</label>
+            <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value as 'SALARIED' | 'CASUAL')} className={inputClass}>
+              <option value="SALARIED">Salaried</option>
+              <option value="CASUAL">Casual</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Job title</label>
+            <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Department</label>
+            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className={inputClass}>
+              <option value="">—</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Start date</label>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Date of birth</label>
+            <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>National ID</label>
+            <input value={nationalId} onChange={(e) => setNationalId(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Gender</label>
+            <select value={gender} onChange={(e) => setGender(e.target.value)} className={inputClass}>
+              <option value="">—</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Default daily rate</label>
+            <input type="number" step="0.01" value={defaultDailyRate} onChange={(e) => setDefaultDailyRate(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
+        </div>
+        {error && <div className="text-sm text-red-600">{error}</div>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className={secondaryBtn}>Cancel</button>
+          <button type="submit" disabled={saving} className={primaryBtn}>
+            {saving ? 'Saving…' : isNew ? 'Create' : 'Save changes'}
+          </button>
+        </div>
+      </form>
+
+      {employee && employee.employmentType === 'SALARIED' && (
+        <LedgerSection farmId={farmId} employeeId={employee.id} />
+      )}
+      {employee && employee.employmentType === 'SALARIED' && (
+        <PaymentsSection farmId={farmId} employeeId={employee.id} />
+      )}
+      {employee && employee.employmentType === 'CASUAL' && (
+        <div className="pt-2 border-t border-gray-200 text-xs text-gray-500">
+          Casual employee payments and daily rates are managed on the Casual Labour page, not here.
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 export default function EmployeesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
@@ -234,8 +588,11 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [farmFilter, setFarmFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [search, setSearch] = useState('');
   const [showImport, setShowImport] = useState(false);
+  const [editing, setEditing] = useState<EmployeeDto | 'new' | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -250,6 +607,13 @@ export default function EmployeesPage() {
     if (isAdmin) load();
   }, [isAdmin]);
 
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
   const farms = useMemo(() => {
     const map = new Map<number, string>();
     employees.forEach((e) => map.set(e.farmId, e.farmName));
@@ -259,6 +623,7 @@ export default function EmployeesPage() {
   const filtered = useMemo(() => {
     return employees.filter((e) => {
       if (farmFilter && String(e.farmId) !== farmFilter) return false;
+      if (typeFilter && e.employmentType !== typeFilter) return false;
       if (search) {
         const q = search.toLowerCase();
         const haystack = `${e.fullName} ${e.lsNumber ?? ''} ${e.employeeId ?? ''} ${e.jobTitle ?? ''}`.toLowerCase();
@@ -266,10 +631,15 @@ export default function EmployeesPage() {
       }
       return true;
     });
-  }, [employees, farmFilter, search]);
+  }, [employees, farmFilter, typeFilter, search]);
 
-  const selectClass =
-    'border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
+  function handleAddEmployee() {
+    if (!farmFilter) {
+      setToast('Pick a farm filter first');
+      return;
+    }
+    setEditing('new');
+  }
 
   if (!isAdmin) {
     return (
@@ -289,6 +659,12 @@ export default function EmployeesPage() {
           ))}
         </select>
 
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={selectClass}>
+          <option value="">All types</option>
+          <option value="SALARIED">Salaried</option>
+          <option value="CASUAL">Casual</option>
+        </select>
+
         <input
           type="text"
           placeholder="Search name, LS number, job title…"
@@ -299,12 +675,12 @@ export default function EmployeesPage() {
 
         <span className="text-xs text-gray-400">{filtered.length} of {employees.length} employees</span>
 
-        <button
-          onClick={() => setShowImport(true)}
-          className="ml-auto px-4 py-2 text-sm rounded-lg bg-green-700 text-white hover:bg-green-800 transition-colors"
-        >
-          Import…
-        </button>
+        {toast && <span className="text-sm text-green-700">{toast}</span>}
+
+        <div className="ml-auto flex gap-2">
+          <button onClick={handleAddEmployee} className={primaryBtn}>Add employee</button>
+          <button onClick={() => setShowImport(true)} className={secondaryBtn}>Import…</button>
+        </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -328,6 +704,7 @@ export default function EmployeesPage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Job Title</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Phone</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -348,6 +725,11 @@ export default function EmployeesPage() {
                         {e.status}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <button onClick={() => setEditing(e)} className="text-green-700 hover:text-green-900 text-xs font-medium">
+                        View
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -358,6 +740,15 @@ export default function EmployeesPage() {
 
       {showImport && (
         <ImportModal onClose={() => setShowImport(false)} onEmployeesImported={load} />
+      )}
+
+      {editing && (
+        <EmployeeModal
+          farmId={editing === 'new' ? Number(farmFilter) : editing.farmId}
+          employee={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(); setToast('Saved'); }}
+        />
       )}
     </div>
   );

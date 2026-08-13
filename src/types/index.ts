@@ -135,6 +135,57 @@ export interface EmployeeCsvImportResult {
   errors: ImportRowError[];
 }
 
+export interface EmployeeRequest {
+  firstName: string;
+  lastName: string | null;
+  phone: string | null;
+  employmentType: 'SALARIED' | 'CASUAL';
+  jobTitle: string | null;
+  departmentId: number | null;
+  startDate: string | null;
+  dateOfBirth: string | null;
+  nationalId: string | null;
+  gender: string | null;
+  defaultDailyRate: number | null;
+  photoBase64: string | null;
+  photoMimeType: string | null;
+  status: string;
+}
+
+export interface EmployeePaymentDto {
+  id: number;
+  employeeId: number;
+  employeeName: string;
+  paymentDate: string;
+  amount: number;
+  note: string | null;
+  paidBy: string | null;
+  createdAt: string;
+}
+
+export interface EmployeeSummaryDto {
+  allTimeEarned: number;
+  allTimePaid: number;
+  outstanding: number;
+  payments: EmployeePaymentDto[];
+}
+
+export interface EmployeeLedgerMonthDto {
+  month: number;
+  earned: number;
+  paid: number;
+  balance: number;
+}
+
+export interface EmployeeLedgerDto {
+  year: number;
+  openingBalance: number;
+  totalEarned: number;
+  totalPaid: number;
+  closingBalance: number;
+  months: EmployeeLedgerMonthDto[];
+}
+
 // ── Payroll ──────────────────────────────────────────────────────────────
 
 export interface PayrollRecordDto {
