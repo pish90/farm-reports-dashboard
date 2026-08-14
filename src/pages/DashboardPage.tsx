@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getFarmEmployees, getMasterEmployeeRegistry } from '../api/employees';
 import { getFarmSummaries, getLiveStatus } from '../api/reports';
 import { useAuth } from '../auth/AuthContext';
+import EmployeeLedgerSection from '../components/EmployeeLedgerSection';
 import StatusBadge from '../components/StatusBadge';
 import { formatMoney } from '../lib/format';
 import type { EmployeeDto, FarmLiveStatusDto, FarmSummaryDto } from '../types';
@@ -11,6 +12,9 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+const selectClass =
+  'border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
@@ -141,6 +145,67 @@ function LiveStatusTable({ rows }: { rows: FarmLiveStatusDto[] }) {
   );
 }
 
+function EmployeeLedgerLookup({
+  farms, employees, isAdmin, fixedFarmId,
+}: {
+  farms: FarmSummaryDto[];
+  employees: EmployeeDto[];
+  isAdmin: boolean;
+  fixedFarmId: number | null;
+}) {
+  const [farmId, setFarmId] = useState<number | null>(isAdmin ? null : fixedFarmId);
+  const [employeeId, setEmployeeId] = useState<number | null>(null);
+
+  const salariedOptions = employees.filter(
+    (e) => e.employmentType === 'SALARIED' && (!isAdmin || e.farmId === farmId),
+  );
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">Employee Ledger</h3>
+      <div className="flex flex-wrap gap-3 items-center mb-4">
+        {isAdmin && (
+          <select
+            value={farmId ?? ''}
+            onChange={(e) => {
+              setFarmId(e.target.value ? Number(e.target.value) : null);
+              setEmployeeId(null);
+            }}
+            className={selectClass}
+          >
+            <option value="">Select farm…</option>
+            {farms.map((f) => (
+              <option key={f.farmId} value={f.farmId}>{f.farmName}</option>
+            ))}
+          </select>
+        )}
+        <select
+          value={employeeId ?? ''}
+          onChange={(e) => setEmployeeId(e.target.value ? Number(e.target.value) : null)}
+          disabled={isAdmin && !farmId}
+          className={selectClass}
+        >
+          <option value="">Select employee…</option>
+          {salariedOptions.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.fullName}{e.lsNumber ? ` (${e.lsNumber})` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+      {farmId && employeeId ? (
+        <EmployeeLedgerSection farmId={farmId} employeeId={employeeId} bordered={false} />
+      ) : (
+        <p className="text-xs text-gray-400">
+          {isAdmin
+            ? 'Pick a farm and a salaried employee to view their annual ledger.'
+            : 'Pick a salaried employee to view their annual ledger.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
@@ -249,6 +314,16 @@ export default function DashboardPage() {
 
       {/* Live status */}
       <LiveStatusTable rows={liveStatus} />
+
+      {/* Employee ledger lookup */}
+      {employees.length > 0 && (
+        <EmployeeLedgerLookup
+          farms={farms}
+          employees={employees}
+          isAdmin={isAdmin}
+          fixedFarmId={user?.farmId ?? null}
+        />
+      )}
     </div>
   );
 }

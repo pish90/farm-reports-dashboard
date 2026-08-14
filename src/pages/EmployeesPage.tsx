@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  createEmployee, deleteEmployeePayment, getEmployeeLedger, getEmployeeSummary,
+  createEmployee, deleteEmployeePayment, getEmployeeSummary,
   getMasterEmployeeRegistry, importEmployeePay, importEmployees, importLivestock, importMilk,
   recordEmployeePayment, updateEmployee,
 } from '../api/employees';
 import { getDepartments } from '../api/farms';
 import { useAuth } from '../auth/AuthContext';
+import EmployeeLedgerSection from '../components/EmployeeLedgerSection';
 import Modal from '../components/Modal';
-import { formatDate, formatMoney, monthName } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import type {
-  DepartmentDto, EmployeeCsvImportResult, EmployeeDto, EmployeeLedgerDto, EmployeeSummaryDto, ImportResult,
+  DepartmentDto, EmployeeCsvImportResult, EmployeeDto, EmployeeSummaryDto, ImportResult,
 } from '../types';
 
 const selectClass =
@@ -20,8 +21,6 @@ const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
 const primaryBtn = 'px-4 py-2 text-sm rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-40 transition-colors';
 const secondaryBtn = 'px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors';
 const dangerLink = 'text-red-600 hover:text-red-800 text-xs font-medium';
-
-const LEDGER_YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
 
 type ImportKind = 'employees' | 'livestock' | 'milk' | 'employeePay';
 type YearMode = 'none' | 'single' | 'startYearMonth';
@@ -240,79 +239,6 @@ function ImportModal({ onClose, onEmployeesImported }: { onClose: () => void; on
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function LedgerSection({ farmId, employeeId }: { farmId: number; employeeId: number }) {
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [ledger, setLedger] = useState<EmployeeLedgerDto | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    getEmployeeLedger(farmId, employeeId, year)
-      .then(setLedger)
-      .catch(() => setLedger(null))
-      .finally(() => setLoading(false));
-  }, [farmId, employeeId, year]);
-
-  return (
-    <div className="pt-2 border-t border-gray-200">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-gray-700">Annual Ledger</h4>
-        <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={selectClass}>
-          {LEDGER_YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
-      </div>
-      {loading ? (
-        <div className="text-xs text-gray-400 py-4 text-center">Loading…</div>
-      ) : !ledger ? (
-        <div className="text-xs text-gray-400 py-4 text-center">Failed to load ledger</div>
-      ) : (
-        <>
-          <div className="grid grid-cols-4 gap-3 mb-4">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-xs text-gray-500">Opening balance</div>
-              <div className="text-sm font-bold text-gray-900">{formatMoney(ledger.openingBalance)}</div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-xs text-gray-500">Earned this year</div>
-              <div className="text-sm font-bold text-gray-900">{formatMoney(ledger.totalEarned)}</div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-xs text-gray-500">Paid this year</div>
-              <div className="text-sm font-bold text-gray-900">{formatMoney(ledger.totalPaid)}</div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-xs text-gray-500">Closing balance</div>
-              <div className="text-sm font-bold text-gray-900">{formatMoney(ledger.closingBalance)}</div>
-            </div>
-          </div>
-          <div className="overflow-x-auto border border-gray-200 rounded-lg">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-3 py-2 font-medium text-gray-600">Month</th>
-                  <th className="text-left px-3 py-2 font-medium text-gray-600">Earned</th>
-                  <th className="text-left px-3 py-2 font-medium text-gray-600">Paid</th>
-                  <th className="text-left px-3 py-2 font-medium text-gray-600">Balance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {ledger.months.map((m) => (
-                  <tr key={m.month}>
-                    <td className="px-3 py-2">{monthName(m.month)}</td>
-                    <td className="px-3 py-2">{formatMoney(m.earned)}</td>
-                    <td className="px-3 py-2">{formatMoney(m.paid)}</td>
-                    <td className="px-3 py-2">{formatMoney(m.balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -566,7 +492,7 @@ function EmployeeModal({
       </form>
 
       {employee && employee.employmentType === 'SALARIED' && (
-        <LedgerSection farmId={farmId} employeeId={employee.id} />
+        <EmployeeLedgerSection farmId={farmId} employeeId={employee.id} />
       )}
       {employee && employee.employmentType === 'SALARIED' && (
         <PaymentsSection farmId={farmId} employeeId={employee.id} />
