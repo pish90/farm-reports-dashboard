@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  createEmployee, deleteEmployeePayment, getEmployeeSummary,
+  createEmployee, deleteEmployeePayment, downloadImportTemplate, getEmployeeSummary,
   getMasterEmployeeRegistry, importEmployeePay, importEmployees, importLivestock, importMilk,
   recordEmployeePayment, updateEmployee,
 } from '../api/employees';
@@ -96,6 +96,7 @@ function ImportModal({ onClose, onEmployeesImported }: { onClose: () => void; on
   const [startYear, setStartYear] = useState(currentYear);
   const [startMonth, setStartMonth] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | EmployeeCsvImportResult | null>(null);
 
@@ -106,6 +107,18 @@ function ImportModal({ onClose, onEmployeesImported }: { onClose: () => void; on
     setFile(null);
     setResult(null);
     setError(null);
+  }
+
+  async function handleDownloadTemplate() {
+    setTemplateBusy(true);
+    setError(null);
+    try {
+      await downloadImportTemplate(tab);
+    } catch {
+      setError('Could not download the template. Please try again.');
+    } finally {
+      setTemplateBusy(false);
+    }
   }
 
   async function submit() {
@@ -158,16 +171,25 @@ function ImportModal({ onClose, onEmployeesImported }: { onClose: () => void; on
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto">
-          <p className="text-sm text-gray-500">
-            {tab === 'employees' &&
-              'Upload the employee_import_template (.csv or .xlsx). Columns: farmName, firstName, lastName, employmentType, phone, NationalID, Gender, DateofBirth, startDate, jobTitle.'}
-            {tab === 'livestock' &&
-              'Upload the livestock_import_template (.xlsx). The file has no year column, so pick the year these figures belong to.'}
-            {tab === 'milk' &&
-              'Upload the Milk_import_template (.xlsx). The file has no year column, so pick the year these figures belong to.'}
-            {tab === 'employeePay' &&
-              'Upload the Employee pay_import sheet (.xlsx) — one row per month, Earned/Paid per employee (by LS number). The file has no year column and month labels repeat, so pick the year and month the FIRST row represents; later rows are assumed to follow in sequence.'}
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-sm text-gray-500">
+              {tab === 'employees' &&
+                'Upload the employee_import_template (.csv or .xlsx). Columns: farmName, firstName, lastName, employmentType, phone, NationalID, Gender, DateofBirth, startDate, jobTitle.'}
+              {tab === 'livestock' &&
+                'Upload the livestock_import_template (.xlsx). The file has no year column, so pick the year these figures belong to.'}
+              {tab === 'milk' &&
+                'Upload the Milk_import_template (.xlsx). The file has no year column, so pick the year these figures belong to.'}
+              {tab === 'employeePay' &&
+                'Upload the Employee pay_import sheet (.xlsx) — one row per month, Earned/Paid per employee (by LS number). The file has no year column and month labels repeat, so pick the year and month the FIRST row represents; later rows are assumed to follow in sequence.'}
+            </p>
+            <button
+              onClick={handleDownloadTemplate}
+              disabled={templateBusy}
+              className="shrink-0 text-xs font-medium text-green-700 hover:text-green-900 disabled:opacity-40 whitespace-nowrap"
+            >
+              {templateBusy ? 'Downloading…' : 'Download example template ↓'}
+            </button>
+          </div>
 
           {activeTab.yearMode === 'single' && (
             <div className="flex items-center gap-2">
