@@ -1,5 +1,5 @@
 import client from './client';
-import type { AuditLogPageDto } from '../types';
+import type { AuditLogDto, PageDto } from '../types';
 
 export async function getAuditLogs(params: {
   farmId?: number;
@@ -9,7 +9,7 @@ export async function getAuditLogs(params: {
   endDate?: string;
   page?: number;
   size?: number;
-}): Promise<AuditLogPageDto> {
-  const res = await client.get<{ data: AuditLogPageDto }>('/admin/audit-logs', { params });
+}): Promise<PageDto<AuditLogDto>> {
+  const res = await client.get<{ data: PageDto<AuditLogDto> }>('/admin/audit-logs', { params });
   return res.data.data;
 }

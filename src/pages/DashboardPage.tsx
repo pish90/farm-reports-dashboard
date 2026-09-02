@@ -218,11 +218,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const now = new Date();
-    const employeesRequest: Promise<EmployeeDto[]> = isAdmin
-      ? getMasterEmployeeRegistry()
+    // This screen needs every employee (headcount stats + the ledger-lookup picker below),
+    // not a page of them — ask for a page large enough to cover the whole roster.
+    const employeesRequest: Promise<EmployeeDto[]> = (isAdmin
+      ? getMasterEmployeeRegistry({ size: 1000 })
       : user?.farmId
-      ? getFarmEmployees(user.farmId)
-      : Promise.resolve([]);
+      ? getFarmEmployees(user.farmId, { size: 1000 })
+      : Promise.resolve({ content: [] as EmployeeDto[], totalElements: 0, totalPages: 0, page: 0, size: 0 })
+    ).then((res) => res.content);
 
     Promise.all([
       getFarmSummaries(),

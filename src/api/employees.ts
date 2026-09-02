@@ -1,16 +1,28 @@
 import client from './client';
 import type {
   EmployeeCsvImportResult, EmployeeDto, EmployeeLedgerDto, EmployeePaymentDto, EmployeeRequest,
-  EmployeeSummaryDto, ImportResult, RecordPaymentRequest,
+  EmployeeSummaryDto, ImportResult, PageDto, RecordPaymentRequest,
 } from '../types';
 
-export async function getMasterEmployeeRegistry(): Promise<EmployeeDto[]> {
-  const res = await client.get<{ data: EmployeeDto[] }>('/admin/employees');
+export interface EmployeeListParams {
+  farmId?: number;
+  employmentType?: string;
+  search?: string;
+  status?: string;
+  page?: number;
+  size?: number;
+}
+
+export async function getMasterEmployeeRegistry(params: EmployeeListParams = {}): Promise<PageDto<EmployeeDto>> {
+  const res = await client.get<{ data: PageDto<EmployeeDto> }>('/admin/employees', { params });
   return res.data.data;
 }
 
-export async function getFarmEmployees(farmId: number): Promise<EmployeeDto[]> {
-  const res = await client.get<{ data: EmployeeDto[] }>(`/farms/${farmId}/employees`);
+export async function getFarmEmployees(
+  farmId: number,
+  params: Omit<EmployeeListParams, 'farmId'> = {},
+): Promise<PageDto<EmployeeDto>> {
+  const res = await client.get<{ data: PageDto<EmployeeDto> }>(`/farms/${farmId}/employees`, { params });
   return res.data.data;
 }
 

@@ -6,6 +6,7 @@ import type {
   CasualPayrollEntryDto,
   CasualWorkSessionDto,
   CreateWorkSessionRequest,
+  PageDto,
   RecordPaymentRequest,
 } from '../types';
 
@@ -49,8 +50,12 @@ export async function deleteCasualPayment(farmId: number, labourerId: number, pa
   await client.delete(`/farms/${farmId}/casual-labourers/${labourerId}/payments/${paymentId}`);
 }
 
-export async function getWorkSessions(farmId: number): Promise<CasualWorkSessionDto[]> {
-  const res = await client.get<{ data: CasualWorkSessionDto[] }>(`/farms/${farmId}/casual-labourers/work-sessions`);
+export async function getWorkSessions(
+  farmId: number,
+  params: { year?: number; month?: number; page?: number; size?: number } = {},
+): Promise<PageDto<CasualWorkSessionDto>> {
+  const res = await client.get<{ data: PageDto<CasualWorkSessionDto> }>(
+    `/farms/${farmId}/casual-labourers/work-sessions`, { params });
   return res.data.data;
 }
 

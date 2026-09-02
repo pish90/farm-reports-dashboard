@@ -1,5 +1,5 @@
 import client from './client';
-import type { FarmLiveStatusDto, FarmSummaryDto, ReportDto } from '../types';
+import type { FarmLiveStatusDto, FarmSummaryDto, PageDto, ReportDto } from '../types';
 
 export async function getFarmSummaries(): Promise<FarmSummaryDto[]> {
   const res = await client.get<{ data: FarmSummaryDto[] }>('/admin/farms');
@@ -18,8 +18,10 @@ export async function listReports(params: {
   year?: number;
   month?: number;
   status?: string;
-}): Promise<ReportDto[]> {
-  const res = await client.get<{ data: ReportDto[] }>('/admin/reports', { params });
+  page?: number;
+  size?: number;
+}): Promise<PageDto<ReportDto>> {
+  const res = await client.get<{ data: PageDto<ReportDto> }>('/admin/reports', { params });
   return res.data.data;
 }
 

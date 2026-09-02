@@ -1,17 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   createEmployee, deleteEmployeePayment, downloadImportTemplate, getEmployeeSummary,
   getMasterEmployeeRegistry, importEmployeePay, importEmployees, importLivestock, importMilk,
   recordEmployeePayment, updateEmployee,
 } from '../api/employees';
 import { getDepartments } from '../api/farms';
+import { getFarmSummaries } from '../api/reports';
 import { useAuth } from '../auth/AuthContext';
 import EmployeeLedgerSection from '../components/EmployeeLedgerSection';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { formatDate, formatMoney } from '../lib/format';
 import type {
-  DepartmentDto, EmployeeCsvImportResult, EmployeeDto, EmployeeSummaryDto, ImportResult,
+  DepartmentDto, EmployeeCsvImportResult, EmployeeDto, EmployeeSummaryDto, FarmSummaryDto,
+  ImportResult, PageDto,
 } from '../types';
+
+const PAGE_SIZE = 10;
 
 const selectClass =
   'border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
@@ -532,28 +537,45 @@ export default function EmployeesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
-  const [employees, setEmployees] = useState<EmployeeDto[]>([]);
+  const [farms, setFarms] = useState<FarmSummaryDto[]>([]);
+  const [result, setResult] = useState<PageDto<EmployeeDto> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [farmFilter, setFarmFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const [editing, setEditing] = useState<EmployeeDto | 'new' | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isAdmin) getFarmSummaries().then(setFarms).catch(() => null);
+  }, [isAdmin]);
+
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(0); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   function load() {
+    if (!isAdmin) return;
     setLoading(true);
     setError(null);
-    getMasterEmployeeRegistry()
-      .then(setEmployees)
+    getMasterEmployeeRegistry({
+      farmId: farmFilter ? Number(farmFilter) : undefined,
+      employmentType: typeFilter || undefined,
+      search: debouncedSearch || undefined,
+      page,
+      size: PAGE_SIZE,
+    })
+      .then(setResult)
       .catch(() => setError('Failed to load employees.'))
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => {
-    if (isAdmin) load();
-  }, [isAdmin]);
+  useEffect(load, [isAdmin, farmFilter, typeFilter, debouncedSearch, page]);
 
   useEffect(() => {
     if (toast) {
@@ -562,24 +584,12 @@ export default function EmployeesPage() {
     }
   }, [toast]);
 
-  const farms = useMemo(() => {
-    const map = new Map<number, string>();
-    employees.forEach((e) => map.set(e.farmId, e.farmName));
-    return Array.from(map.entries()).map(([farmId, farmName]) => ({ farmId, farmName }));
-  }, [employees]);
+  const employees = result?.content ?? [];
 
-  const filtered = useMemo(() => {
-    return employees.filter((e) => {
-      if (farmFilter && String(e.farmId) !== farmFilter) return false;
-      if (typeFilter && e.employmentType !== typeFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const haystack = `${e.fullName} ${e.lsNumber ?? ''} ${e.employeeId ?? ''} ${e.jobTitle ?? ''}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [employees, farmFilter, typeFilter, search]);
+  function changePage(next: number) {
+    setPage(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   function handleAddEmployee() {
     if (!farmFilter) {
@@ -600,14 +610,22 @@ export default function EmployeesPage() {
   return (
     <div className="space-y-5">
       <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3 items-center">
-        <select value={farmFilter} onChange={(e) => setFarmFilter(e.target.value)} className={selectClass}>
+        <select
+          value={farmFilter}
+          onChange={(e) => { setFarmFilter(e.target.value); setPage(0); }}
+          className={selectClass}
+        >
           <option value="">All Farms</option>
           {farms.map((f) => (
             <option key={f.farmId} value={f.farmId}>{f.farmName}</option>
           ))}
         </select>
 
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={selectClass}>
+        <select
+          value={typeFilter}
+          onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
+          className={selectClass}
+        >
           <option value="">All types</option>
           <option value="SALARIED">Salaried</option>
           <option value="CASUAL">Casual</option>
@@ -621,7 +639,7 @@ export default function EmployeesPage() {
           className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
         />
 
-        <span className="text-xs text-gray-400">{filtered.length} of {employees.length} employees</span>
+        {result && <span className="text-xs text-gray-400">{result.totalElements} employees</span>}
 
         {toast && <span className="text-sm text-green-700">{toast}</span>}
 
@@ -638,9 +656,10 @@ export default function EmployeesPage() {
           </div>
         ) : error ? (
           <div className="p-6 text-red-600 text-sm">{error}</div>
-        ) : filtered.length === 0 ? (
+        ) : employees.length === 0 ? (
           <div className="p-10 text-center text-gray-400 text-sm">No employees found.</div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -656,7 +675,7 @@ export default function EmployeesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map((e) => (
+                {employees.map((e) => (
                   <tr key={e.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-gray-500 font-mono text-xs whitespace-nowrap">{e.lsNumber ?? '—'}</td>
                     <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{e.fullName}</td>
@@ -683,6 +702,17 @@ export default function EmployeesPage() {
               </tbody>
             </table>
           </div>
+          {result && (
+            <Pagination
+              page={result.page}
+              pageSize={PAGE_SIZE}
+              totalPages={result.totalPages}
+              totalElements={result.totalElements}
+              onPrev={() => changePage(page - 1)}
+              onNext={() => changePage(page + 1)}
+            />
+          )}
+          </>
         )}
       </div>
 

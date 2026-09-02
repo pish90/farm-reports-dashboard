@@ -7,9 +7,11 @@ import {
 import { getDepartments } from '../api/farms';
 import { useFarmScope } from '../auth/useFarmScope';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { formatDate, formatMoney, MONTH_NAMES } from '../lib/format';
 import type {
   CasualLabourerDto, CasualLabourerSummaryDto, CasualPayrollEntryDto, CasualWorkSessionDto, DepartmentDto,
+  PageDto,
 } from '../types';
 
 const now = new Date();
@@ -376,23 +378,33 @@ function LabourerModal({
 
 // ── Work sessions ────────────────────────────────────────────────────────
 
+const SESSIONS_PAGE_SIZE = 10;
+
 function SessionsTab({ farmId, showToast }: { farmId: number; showToast: (m: string) => void }) {
-  const [sessions, setSessions] = useState<CasualWorkSessionDto[]>([]);
+  const [result, setResult] = useState<PageDto<CasualWorkSessionDto> | null>(null);
   const [labourers, setLabourers] = useState<CasualLabourerDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<CasualWorkSessionDto | 'new' | null>(null);
+  const [page, setPage] = useState(0);
 
   function load() {
     setLoading(true);
     setError(null);
-    Promise.all([getWorkSessions(farmId), getCasualLabourers(farmId)])
-      .then(([s, l]) => { setSessions(s); setLabourers(l); })
+    Promise.all([getWorkSessions(farmId, { page, size: SESSIONS_PAGE_SIZE }), getCasualLabourers(farmId)])
+      .then(([s, l]) => { setResult(s); setLabourers(l); })
       .catch(() => setError('Failed to load work sessions.'))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [farmId]);
+  useEffect(() => { setPage(0); }, [farmId]);
+  useEffect(load, [farmId, page]);
+
+  const sessions = result?.content ?? [];
+
+  function changePage(next: number) {
+    setPage(next);
+  }
 
   async function handleDelete(id: number) {
     if (!confirm('Delete this work session?')) return;
@@ -447,6 +459,17 @@ function SessionsTab({ farmId, showToast }: { farmId: number; showToast: (m: str
             </tbody>
           </table>
         </div>
+      )}
+
+      {result && sessions.length > 0 && (
+        <Pagination
+          page={result.page}
+          pageSize={SESSIONS_PAGE_SIZE}
+          totalPages={result.totalPages}
+          totalElements={result.totalElements}
+          onPrev={() => changePage(page - 1)}
+          onNext={() => changePage(page + 1)}
+        />
       )}
 
       {editing && (

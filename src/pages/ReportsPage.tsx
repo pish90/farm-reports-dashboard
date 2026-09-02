@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getFarmSummaries, listReports } from '../api/reports';
+import Pagination from '../components/Pagination';
 import StatusBadge from '../components/StatusBadge';
-import type { FarmSummaryDto, ReportDto } from '../types';
+import type { FarmSummaryDto, PageDto, ReportDto } from '../types';
+
+const PAGE_SIZE = 10;
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -22,7 +25,7 @@ export default function ReportsPage() {
   const navigate = useNavigate();
 
   const [farms, setFarms] = useState<FarmSummaryDto[]>([]);
-  const [reports, setReports] = useState<ReportDto[]>([]);
+  const [result, setResult] = useState<PageDto<ReportDto> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +33,7 @@ export default function ReportsPage() {
   const [yearFilter, setYearFilter] = useState<string>('');
   const [monthFilter, setMonthFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [page, setPage] = useState(0);
 
   // Load farms for the dropdown map
   useEffect(() => {
@@ -41,17 +45,28 @@ export default function ReportsPage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    const params: Parameters<typeof listReports>[0] = {};
+    const params: Parameters<typeof listReports>[0] = { page, size: PAGE_SIZE };
     if (farmFilter) params.farmId = Number(farmFilter);
     if (yearFilter) params.year = Number(yearFilter);
     if (monthFilter) params.month = Number(monthFilter);
     if (statusFilter) params.status = statusFilter;
 
     listReports(params)
-      .then(setReports)
+      .then(setResult)
       .catch(() => setError('Failed to load reports.'))
       .finally(() => setLoading(false));
-  }, [farmFilter, yearFilter, monthFilter, statusFilter]);
+  }, [farmFilter, yearFilter, monthFilter, statusFilter, page]);
+
+  function updateFilter(setter: (v: string) => void) {
+    return (v: string) => { setter(v); setPage(0); };
+  }
+
+  function changePage(next: number) {
+    setPage(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  const reports = result?.content ?? [];
 
   const farmMap: Record<number, string> = {};
   farms.forEach((f) => { farmMap[f.farmId] = f.farmName; });
@@ -65,7 +80,7 @@ export default function ReportsPage() {
       <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3 items-center">
         <select
           value={farmFilter}
-          onChange={(e) => setFarmFilter(e.target.value)}
+          onChange={(e) => updateFilter(setFarmFilter)(e.target.value)}
           className={selectClass}
         >
           <option value="">All Farms</option>
@@ -78,7 +93,7 @@ export default function ReportsPage() {
 
         <select
           value={yearFilter}
-          onChange={(e) => setYearFilter(e.target.value)}
+          onChange={(e) => updateFilter(setYearFilter)(e.target.value)}
           className={selectClass}
         >
           <option value="">All Years</option>
@@ -89,7 +104,7 @@ export default function ReportsPage() {
 
         <select
           value={monthFilter}
-          onChange={(e) => setMonthFilter(e.target.value)}
+          onChange={(e) => updateFilter(setMonthFilter)(e.target.value)}
           className={selectClass}
         >
           <option value="">All Months</option>
@@ -100,7 +115,7 @@ export default function ReportsPage() {
 
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => updateFilter(setStatusFilter)(e.target.value)}
           className={selectClass}
         >
           {STATUS_OPTIONS.map((o) => (
@@ -110,12 +125,16 @@ export default function ReportsPage() {
 
         {(farmFilter || yearFilter || monthFilter || statusFilter) && (
           <button
-            onClick={() => { setFarmFilter(''); setYearFilter(''); setMonthFilter(''); setStatusFilter(''); }}
+            onClick={() => {
+              setFarmFilter(''); setYearFilter(''); setMonthFilter(''); setStatusFilter(''); setPage(0);
+            }}
             className="text-sm text-gray-500 hover:text-red-600 transition-colors"
           >
             Clear filters
           </button>
         )}
+
+        {result && <span className="ml-auto text-xs text-gray-400">{result.totalElements} reports</span>}
       </div>
 
       {/* Table */}
@@ -129,6 +148,7 @@ export default function ReportsPage() {
         ) : reports.length === 0 ? (
           <div className="p-10 text-center text-gray-400 text-sm">No reports found.</div>
         ) : (
+          <>
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -165,6 +185,17 @@ export default function ReportsPage() {
               ))}
             </tbody>
           </table>
+          {result && (
+            <Pagination
+              page={result.page}
+              pageSize={PAGE_SIZE}
+              totalPages={result.totalPages}
+              totalElements={result.totalElements}
+              onPrev={() => changePage(page - 1)}
+              onNext={() => changePage(page + 1)}
+            />
+          )}
+          </>
         )}
       </div>
     </div>

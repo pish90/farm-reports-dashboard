@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { getAuditLogs } from '../api/audit';
 import { getFarmSummaries } from '../api/reports';
 import { useAuth } from '../auth/AuthContext';
-import type { AuditAction, AuditLogDto, AuditLogPageDto, FarmSummaryDto } from '../types';
+import Pagination from '../components/Pagination';
+import type { AuditAction, AuditLogDto, FarmSummaryDto, PageDto } from '../types';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 10;
 
 const ALL_ACTIONS: AuditAction[] = [
   'LOGIN', 'LOGIN_FAILED', 'PASSWORD_CHANGED', 'PASSWORD_RESET',
@@ -50,42 +51,6 @@ function roleBadge(role: string | null): string {
   }
 }
 
-function Pagination({
-  page, totalPages, totalElements, onPrev, onNext,
-}: {
-  page: number; totalPages: number; totalElements: number;
-  onPrev: () => void; onNext: () => void;
-}) {
-  const from = page * PAGE_SIZE + 1;
-  const to   = Math.min((page + 1) * PAGE_SIZE, totalElements);
-  return (
-    <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 text-sm text-gray-600">
-      <span>
-        {totalElements === 0 ? '0 results' : `${from}–${to} of ${totalElements}`}
-      </span>
-      <div className="flex gap-2">
-        <button
-          onClick={onPrev}
-          disabled={page === 0}
-          className="px-3 py-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50 transition-colors"
-        >
-          ← Prev
-        </button>
-        <span className="px-3 py-1.5 text-gray-500">
-          Page {page + 1} / {Math.max(1, totalPages)}
-        </span>
-        <button
-          onClick={onNext}
-          disabled={page >= totalPages - 1}
-          className="px-3 py-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50 transition-colors"
-        >
-          Next →
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function AuditRow({ log }: { log: AuditLogDto }) {
   return (
     <tr className="hover:bg-gray-50 transition-colors">
@@ -123,7 +88,7 @@ export default function AuditLogPage() {
   const canFilterFarm = isAdmin || user?.role === 'OPERATIONS_MANAGER';
 
   const [farms, setFarms]   = useState<FarmSummaryDto[]>([]);
-  const [result, setResult] = useState<AuditLogPageDto | null>(null);
+  const [result, setResult] = useState<PageDto<AuditLogDto> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
@@ -275,6 +240,7 @@ export default function AuditLogPage() {
             </div>
             <Pagination
               page={result.page}
+              pageSize={PAGE_SIZE}
               totalPages={result.totalPages}
               totalElements={result.totalElements}
               onPrev={() => changePage(page - 1)}

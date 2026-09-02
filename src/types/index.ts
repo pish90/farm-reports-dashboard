@@ -98,8 +98,8 @@ export interface AuditLogDto {
   ipAddress: string | null;
 }
 
-export interface AuditLogPageDto {
-  content: AuditLogDto[];
+export interface PageDto<T> {
+  content: T[];
   totalElements: number;
   totalPages: number;
   page: number;
