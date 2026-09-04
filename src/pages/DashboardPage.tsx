@@ -157,7 +157,7 @@ function EmployeeLedgerLookup({
   const [employeeId, setEmployeeId] = useState<number | null>(null);
 
   const salariedOptions = employees.filter(
-    (e) => e.employmentType === 'SALARIED' && (!isAdmin || e.farmId === farmId),
+    (e) => e.isSalaried && (!isAdmin || e.farmId === farmId),
   );
 
   return (

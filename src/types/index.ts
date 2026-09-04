@@ -116,7 +116,8 @@ export interface EmployeeDto {
   lastName: string | null;
   fullName: string;
   phone: string | null;
-  employmentType: 'SALARIED' | 'CASUAL';
+  isSalaried: boolean;
+  isCasual: boolean;
   jobTitle: string | null;
   departmentName: string | null;
   startDate: string | null;
@@ -147,6 +148,7 @@ export interface EmployeeCsvImportResult {
   success: boolean;
   totalRows: number;
   importedCount: number;
+  mergedCount: number;
   errors: ImportRowError[];
 }
 
@@ -154,7 +156,8 @@ export interface EmployeeRequest {
   firstName: string;
   lastName: string | null;
   phone: string | null;
-  employmentType: 'SALARIED' | 'CASUAL';
+  isSalaried: boolean;
+  isCasual: boolean;
   jobTitle: string | null;
   departmentId: number | null;
   startDate: string | null;

@@ -6,7 +6,8 @@ import type {
 
 export interface EmployeeListParams {
   farmId?: number;
-  employmentType?: string;
+  isSalaried?: boolean;
+  isCasual?: boolean;
   search?: string;
   status?: string;
   page?: number;

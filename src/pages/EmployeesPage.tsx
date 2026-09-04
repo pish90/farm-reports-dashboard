@@ -45,10 +45,20 @@ const TABS: { key: ImportKind; label: string; accept: string; yearMode: YearMode
   { key: 'employeePay', label: 'Employee Pay', accept: '.xlsx', yearMode: 'startYearMonth' },
 ];
 
-function employmentTypeBadge(type: string): string {
-  return type === 'SALARIED'
-    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-    : 'bg-amber-100 text-amber-800 border border-amber-200';
+const salariedBadgeClass = 'bg-blue-100 text-blue-800 border border-blue-200';
+const casualBadgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+
+function EmploymentTypeBadges({ isSalaried, isCasual }: { isSalaried: boolean; isCasual: boolean }) {
+  return (
+    <span className="inline-flex gap-1">
+      {isSalaried && (
+        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${salariedBadgeClass}`}>Salaried</span>
+      )}
+      {isCasual && (
+        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${casualBadgeClass}`}>Casual</span>
+      )}
+    </span>
+  );
 }
 
 function statusBadge(status: string): string {
@@ -59,9 +69,11 @@ function statusBadge(status: string): string {
 
 function ImportResultBanner({ result }: { result: ImportResult | EmployeeCsvImportResult }) {
   if (result.success) {
+    const mergedCount = 'mergedCount' in result ? result.mergedCount : 0;
     return (
       <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
         Imported {result.importedCount} of {result.totalRows} row(s) successfully.
+        {mergedCount > 0 && ` Merged ${mergedCount} existing employee(s) with a new employment type.`}
       </div>
     );
   }
@@ -180,7 +192,7 @@ function ImportModal({ onClose, onEmployeesImported }: { onClose: () => void; on
           <div className="flex items-start justify-between gap-4">
             <p className="text-sm text-gray-500">
               {tab === 'employees' &&
-                'Upload the employee_import_template (.csv or .xlsx). Columns: farmName, firstName, lastName, employmentType, phone, NationalID, Gender, DateofBirth, startDate, jobTitle.'}
+                'Upload the employee_import_template (.csv or .xlsx). Columns: farmName, firstName, lastName, employmentType (SALARIED, CASUAL, or BOTH), phone, NationalID, Gender, DateofBirth, startDate, jobTitle. A row matching an existing employee\'s name but requesting a type they don\'t already have merges into them instead of erroring.'}
               {tab === 'livestock' &&
                 'Upload the livestock_import_template (.xlsx). The file has no year column, so pick the year these figures belong to.'}
               {tab === 'milk' &&
@@ -394,7 +406,8 @@ function EmployeeModal({
   const [firstName, setFirstName] = useState(employee?.firstName ?? '');
   const [lastName, setLastName] = useState(employee?.lastName ?? '');
   const [phone, setPhone] = useState(employee?.phone ?? '');
-  const [employmentType, setEmploymentType] = useState<'SALARIED' | 'CASUAL'>(employee?.employmentType ?? 'SALARIED');
+  const [isSalaried, setIsSalaried] = useState(employee?.isSalaried ?? true);
+  const [isCasual, setIsCasual] = useState(employee?.isCasual ?? false);
   const [jobTitle, setJobTitle] = useState(employee?.jobTitle ?? '');
   const [departmentId, setDepartmentId] = useState('');
   const [startDate, setStartDate] = useState(employee?.startDate ?? '');
@@ -412,6 +425,10 @@ function EmployeeModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!isSalaried && !isCasual) {
+      setError('Employee must be salaried, casual, or both.');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -419,7 +436,8 @@ function EmployeeModal({
         firstName,
         lastName: lastName || null,
         phone: phone || null,
-        employmentType,
+        isSalaried,
+        isCasual,
         jobTitle: jobTitle || null,
         departmentId: departmentId ? Number(departmentId) : null,
         startDate: startDate || null,
@@ -488,10 +506,14 @@ function EmployeeModal({
           </div>
           <div>
             <label className={labelClass}>Employment type</label>
-            <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value as 'SALARIED' | 'CASUAL')} className={inputClass}>
-              <option value="SALARIED">Salaried</option>
-              <option value="CASUAL">Casual</option>
-            </select>
+            <div className="flex items-center gap-4 h-[2.125rem]">
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 font-normal">
+                <input type="checkbox" checked={isSalaried} onChange={(e) => setIsSalaried(e.target.checked)} /> Salaried
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 font-normal">
+                <input type="checkbox" checked={isCasual} onChange={(e) => setIsCasual(e.target.checked)} /> Casual
+              </label>
+            </div>
           </div>
           <div>
             <label className={labelClass}>Job title</label>
@@ -561,15 +583,18 @@ function EmployeeModal({
         </div>
       </form>
 
-      {employee && employee.employmentType === 'SALARIED' && (
-        <EmployeeLedgerSection farmId={farmId} employeeId={employee.id} />
+      {employee && employee.isSalaried && (
+        <EmployeeLedgerSection farmId={farmId} employeeId={employee.id} kind="salaried" title="Annual Ledger (Salaried)" />
       )}
-      {employee && employee.employmentType === 'SALARIED' && (
+      {employee && employee.isSalaried && (
         <PaymentsSection farmId={farmId} employeeId={employee.id} />
       )}
-      {employee && employee.employmentType === 'CASUAL' && (
+      {employee && employee.isCasual && (
+        <EmployeeLedgerSection farmId={farmId} employeeId={employee.id} kind="casual" title="Annual Ledger (Casual)" />
+      )}
+      {employee && employee.isCasual && (
         <div className="pt-2 border-t border-gray-200 text-xs text-gray-500">
-          Casual employee payments and daily rates are managed on the Casual Labour page, not here.
+          Casual work sessions and payments are managed on the Casual Labour page, not here.
         </div>
       )}
     </Modal>
@@ -608,7 +633,10 @@ export default function EmployeesPage() {
     setError(null);
     getMasterEmployeeRegistry({
       farmId: farmFilter ? Number(farmFilter) : undefined,
-      employmentType: typeFilter || undefined,
+      // Each filter option is exact (not "at least"), so both flags are sent explicitly
+      // whenever a type filter is chosen — otherwise SALARIED would also match BOTH employees.
+      isSalaried: typeFilter === 'SALARIED' ? true : typeFilter === 'CASUAL' ? false : typeFilter === 'BOTH' ? true : undefined,
+      isCasual: typeFilter === 'CASUAL' ? true : typeFilter === 'SALARIED' ? false : typeFilter === 'BOTH' ? true : undefined,
       search: debouncedSearch || undefined,
       page,
       size: PAGE_SIZE,
@@ -672,6 +700,7 @@ export default function EmployeesPage() {
           <option value="">All types</option>
           <option value="SALARIED">Salaried</option>
           <option value="CASUAL">Casual</option>
+          <option value="BOTH">Salaried + Casual</option>
         </select>
 
         <input
@@ -724,9 +753,7 @@ export default function EmployeesPage() {
                     <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{e.fullName}</td>
                     <td className="px-4 py-3 text-gray-700">{e.farmName}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${employmentTypeBadge(e.employmentType)}`}>
-                        {e.employmentType}
-                      </span>
+                      <EmploymentTypeBadges isSalaried={e.isSalaried} isCasual={e.isCasual} />
                     </td>
                     <td className="px-4 py-3 text-gray-700">{e.jobTitle ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500">{e.phone ?? '—'}</td>

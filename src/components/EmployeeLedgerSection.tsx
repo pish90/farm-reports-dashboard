@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getCasualLabourerLedger } from '../api/casual';
 import { getEmployeeLedger } from '../api/employees';
 import { formatMoney, monthName } from '../lib/format';
 import type { EmployeeLedgerDto } from '../types';
@@ -9,11 +10,13 @@ const selectClass =
 const LEDGER_YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
 
 export default function EmployeeLedgerSection({
-  farmId, employeeId, bordered = true,
+  farmId, employeeId, bordered = true, kind = 'salaried', title,
 }: {
   farmId: number;
   employeeId: number;
   bordered?: boolean;
+  kind?: 'salaried' | 'casual';
+  title?: string;
 }) {
   const [year, setYear] = useState(new Date().getFullYear());
   const [ledger, setLedger] = useState<EmployeeLedgerDto | null>(null);
@@ -21,16 +24,17 @@ export default function EmployeeLedgerSection({
 
   useEffect(() => {
     setLoading(true);
-    getEmployeeLedger(farmId, employeeId, year)
+    const fetchLedger = kind === 'casual' ? getCasualLabourerLedger : getEmployeeLedger;
+    fetchLedger(farmId, employeeId, year)
       .then(setLedger)
       .catch(() => setLedger(null))
       .finally(() => setLoading(false));
-  }, [farmId, employeeId, year]);
+  }, [farmId, employeeId, year, kind]);
 
   return (
     <div className={bordered ? 'pt-2 border-t border-gray-200' : ''}>
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-gray-700">Annual Ledger</h4>
+        <h4 className="text-sm font-semibold text-gray-700">{title ?? 'Annual Ledger'}</h4>
         <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={selectClass}>
           {LEDGER_YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>

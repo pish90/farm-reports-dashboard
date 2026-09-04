@@ -6,6 +6,7 @@ import type {
   CasualPayrollEntryDto,
   CasualWorkSessionDto,
   CreateWorkSessionRequest,
+  EmployeeLedgerDto,
   PageDto,
   RecordPaymentRequest,
 } from '../types';
@@ -35,6 +36,13 @@ export async function deactivateCasualLabourer(farmId: number, labourerId: numbe
 
 export async function getCasualLabourerSummary(farmId: number, labourerId: number): Promise<CasualLabourerSummaryDto> {
   const res = await client.get<{ data: CasualLabourerSummaryDto }>(`/farms/${farmId}/casual-labourers/${labourerId}/summary`);
+  return res.data.data;
+}
+
+export async function getCasualLabourerLedger(farmId: number, labourerId: number, year: number): Promise<EmployeeLedgerDto> {
+  const res = await client.get<{ data: EmployeeLedgerDto }>(`/farms/${farmId}/casual-labourers/${labourerId}/ledger`, {
+    params: { year },
+  });
   return res.data.data;
 }
 
