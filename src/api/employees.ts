@@ -31,6 +31,15 @@ export async function createEmployee(farmId: number, req: EmployeeRequest): Prom
   return res.data.data;
 }
 
+export async function deactivateEmployee(farmId: number, id: number): Promise<EmployeeDto> {
+  const res = await client.put<{ data: EmployeeDto }>(`/farms/${farmId}/employees/${id}/deactivate`);
+  return res.data.data;
+}
+
+export async function deleteEmployee(farmId: number, id: number): Promise<void> {
+  await client.delete(`/farms/${farmId}/employees/${id}`);
+}
+
 export async function updateEmployee(farmId: number, id: number, req: EmployeeRequest): Promise<EmployeeDto> {
   const res = await client.put<{ data: EmployeeDto }>(`/farms/${farmId}/employees/${id}`, req);
   return res.data.data;

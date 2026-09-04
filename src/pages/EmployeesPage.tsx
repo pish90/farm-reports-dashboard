@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  createEmployee, deleteEmployeePayment, downloadImportTemplate, getEmployeeSummary,
-  getMasterEmployeeRegistry, importEmployeePay, importEmployees, importLivestock, importMilk,
-  recordEmployeePayment, updateEmployee,
+  createEmployee, deactivateEmployee, deleteEmployee, deleteEmployeePayment, downloadImportTemplate,
+  getEmployeeSummary, getMasterEmployeeRegistry, importEmployeePay, importEmployees, importLivestock,
+  importMilk, recordEmployeePayment, updateEmployee,
 } from '../api/employees';
 import { getDepartments } from '../api/farms';
 import { getFarmSummaries } from '../api/reports';
@@ -26,6 +26,7 @@ const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
 const primaryBtn = 'px-4 py-2 text-sm rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-40 transition-colors';
 const secondaryBtn = 'px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors';
 const dangerLink = 'text-red-600 hover:text-red-800 text-xs font-medium';
+const dangerBtn = 'px-4 py-2 text-sm rounded-lg border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors';
 
 type ImportKind = 'employees' | 'livestock' | 'milk' | 'employeePay';
 type YearMode = 'none' | 'single' | 'startYearMonth';
@@ -386,7 +387,7 @@ function EmployeeModal({
   farmId: number;
   employee: EmployeeDto | null;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (message?: string) => void;
 }) {
   const isNew = !employee;
   const [departments, setDepartments] = useState<DepartmentDto[]>([]);
@@ -436,6 +437,34 @@ function EmployeeModal({
     } catch {
       setError('Failed to save employee.');
     } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeactivate() {
+    if (!employee) return;
+    if (!confirm(`Deactivate ${employee.fullName}? They'll be marked inactive but their history is kept.`)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await deactivateEmployee(farmId, employee.id);
+      onSaved('Employee deactivated');
+    } catch {
+      setError('Failed to deactivate employee.');
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!employee) return;
+    if (!confirm(`Permanently delete ${employee.fullName}? This cannot be undone.`)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteEmployee(farmId, employee.id);
+      onSaved('Employee deleted');
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Failed to delete employee.');
       setSaving(false);
     }
   }
@@ -510,11 +539,25 @@ function EmployeeModal({
           </div>
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className={secondaryBtn}>Cancel</button>
-          <button type="submit" disabled={saving} className={primaryBtn}>
-            {saving ? 'Saving…' : isNew ? 'Create' : 'Save changes'}
-          </button>
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            {!isNew && employee.status === 'ACTIVE' && (
+              <button type="button" onClick={handleDeactivate} disabled={saving} className={dangerBtn}>
+                Deactivate
+              </button>
+            )}
+            {!isNew && (
+              <button type="button" onClick={handleDelete} disabled={saving} className={dangerBtn}>
+                Delete
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className={secondaryBtn}>Cancel</button>
+            <button type="submit" disabled={saving} className={primaryBtn}>
+              {saving ? 'Saving…' : isNew ? 'Create' : 'Save changes'}
+            </button>
+          </div>
         </div>
       </form>
 
@@ -725,7 +768,7 @@ export default function EmployeesPage() {
           farmId={editing === 'new' ? Number(farmFilter) : editing.farmId}
           employee={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); setToast('Saved'); }}
+          onSaved={(message) => { setEditing(null); load(); setToast(message ?? 'Saved'); }}
         />
       )}
     </div>
