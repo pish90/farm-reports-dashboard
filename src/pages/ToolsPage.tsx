@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createAttendanceBackup, downloadAttendanceBackup, exportAllFarmsExcel, resetUserPassword } from '../api/admin';
+import { exportAllFarmsExcel, resetUserPassword } from '../api/admin';
 import { useAuth } from '../auth/AuthContext';
 import { MONTH_NAMES } from '../lib/format';
 
@@ -34,8 +34,6 @@ export default function ToolsPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [exporting, setExporting] = useState(false);
 
-  const [backupBusy, setBackupBusy] = useState<'download' | 'create' | null>(null);
-
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [resetting, setResetting] = useState(false);
@@ -65,29 +63,6 @@ export default function ToolsPage() {
       notify('Export failed.', true);
     } finally {
       setExporting(false);
-    }
-  }
-
-  async function handleDownloadOnly() {
-    setBackupBusy('download');
-    try {
-      await downloadAttendanceBackup();
-    } catch {
-      notify('Download failed.', true);
-    } finally {
-      setBackupBusy(null);
-    }
-  }
-
-  async function handleCreateBackup() {
-    setBackupBusy('create');
-    try {
-      await createAttendanceBackup();
-      notify('Backup created');
-    } catch {
-      notify('Backup failed.', true);
-    } finally {
-      setBackupBusy(null);
     }
   }
 
@@ -122,17 +97,6 @@ export default function ToolsPage() {
           </select>
           <button onClick={handleExportAll} disabled={exporting} className={primaryBtn}>
             {exporting ? 'Exporting…' : 'Export'}
-          </button>
-        </div>
-      </Card>
-
-      <Card title="Attendance backups" description="Creates a saved backup row and downloads the CSV of all attendance ever recorded.">
-        <div className="flex flex-wrap gap-3">
-          <button onClick={handleDownloadOnly} disabled={backupBusy !== null} className={secondaryBtn}>
-            {backupBusy === 'download' ? 'Downloading…' : 'Download current CSV (no save)'}
-          </button>
-          <button onClick={handleCreateBackup} disabled={backupBusy !== null} className={primaryBtn}>
-            {backupBusy === 'create' ? 'Creating…' : 'Create backup + download'}
           </button>
         </div>
       </Card>

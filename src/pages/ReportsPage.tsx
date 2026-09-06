@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getFarmSummaries, listReports } from '../api/reports';
+import MilkProductionChart from '../components/MilkProductionChart';
 import Pagination from '../components/Pagination';
 import StatusBadge from '../components/StatusBadge';
 import type { FarmSummaryDto, PageDto, ReportDto } from '../types';
@@ -76,6 +77,9 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-5">
+      {/* Milk production chart */}
+      <MilkProductionChart />
+
       {/* Filter bar */}
       <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3 items-center">
         <select

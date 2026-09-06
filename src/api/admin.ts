@@ -24,14 +24,6 @@ export async function exportAllFarmsExcel(year: number, month: number): Promise<
   );
 }
 
-export async function downloadAttendanceBackup(): Promise<void> {
-  await downloadBlob('/admin/backup/attendance', 'attendance_backup.csv');
-}
-
-export async function createAttendanceBackup(): Promise<void> {
-  await downloadBlob('/admin/backup', `attendance-backup-${new Date().toISOString().slice(0, 10)}.csv`, 'POST');
-}
-
 export async function resetUserPassword(email: string, newPassword: string): Promise<void> {
   await client.put('/admin/users/reset-password', { email, newPassword });
 }

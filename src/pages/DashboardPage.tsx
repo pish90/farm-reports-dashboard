@@ -13,6 +13,9 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+const now = new Date();
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => now.getFullYear() - i);
+
 const selectClass =
   'border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
 
@@ -104,7 +107,7 @@ function LiveStatusTable({ rows }: { rows: FarmLiveStatusDto[] }) {
                 <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Farm</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Report</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Active workers</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Attendance days</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Payroll</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Livestock</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Milk</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Expense rows</th>
@@ -118,7 +121,7 @@ function LiveStatusTable({ rows }: { rows: FarmLiveStatusDto[] }) {
                   <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{f.farmName}</td>
                   <td className="px-4 py-3"><StatusBadge status={f.reportStatus} /></td>
                   <td className="px-4 py-3 text-gray-700">{f.activeWorkers}</td>
-                  <td className="px-4 py-3 text-gray-700">{f.attendanceDaysRecorded}</td>
+                  <td className="px-4 py-3 text-gray-700">{f.payrollEntriesRecorded}</td>
                   <td className="px-4 py-3 text-gray-700">{f.livestockEntered ? 'Yes' : 'No'}</td>
                   <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{f.milkTotalLitres.toFixed(1)} L</td>
                   <td className="px-4 py-3 text-gray-700">{f.expenseCount}</td>
@@ -215,9 +218,10 @@ export default function DashboardPage() {
   const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
 
   useEffect(() => {
-    const now = new Date();
     // This screen needs every employee (headcount stats + the ledger-lookup picker below),
     // not a page of them — ask for a page large enough to cover the whole roster.
     const employeesRequest: Promise<EmployeeDto[]> = (isAdmin
@@ -229,7 +233,7 @@ export default function DashboardPage() {
 
     Promise.all([
       getFarmSummaries(),
-      getLiveStatus(now.getFullYear(), now.getMonth() + 1),
+      getLiveStatus(year, month),
       employeesRequest.catch(() => []),
     ])
       .then(([farmData, liveStatusData, employeeData]) => {
@@ -239,7 +243,7 @@ export default function DashboardPage() {
       })
       .catch(() => setError('Failed to load farm data.'))
       .finally(() => setLoading(false));
-  }, [isAdmin, user?.farmId]);
+  }, [isAdmin, user?.farmId, year, month]);
 
   const totalMilk = farms.reduce((sum, f) => sum + f.totalMilkThisMonth, 0);
   const totalExpenses = farms.reduce((sum, f) => sum + f.totalExpensesThisMonth, 0);
@@ -273,12 +277,23 @@ export default function DashboardPage() {
     );
   }
 
-  const now = new Date();
-  const monthName = MONTH_NAMES[now.getMonth()];
-
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-500">Overview for {monthName} {now.getFullYear()}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm text-gray-500">Overview for {MONTH_NAMES[month - 1]} {year}</p>
+        <div className="flex gap-2 sm:ml-auto">
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={selectClass}>
+            {YEAR_OPTIONS.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={selectClass}>
+            {MONTH_NAMES.map((name, idx) => (
+              <option key={idx + 1} value={idx + 1}>{name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Quick stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

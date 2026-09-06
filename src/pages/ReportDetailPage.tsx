@@ -3,17 +3,17 @@ import { Link, useParams } from 'react-router-dom';
 import { downloadExport, getReport } from '../api/reports';
 import StatusBadge from '../components/StatusBadge';
 import type { ReportDto } from '../types';
-import AttendanceTab from './report-tabs/AttendanceTab';
 import ExpensesTab from './report-tabs/ExpensesTab';
 import LivestockTab from './report-tabs/LivestockTab';
 import MilkTab from './report-tabs/MilkTab';
+import PayrollTab from './report-tabs/PayrollTab';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const TABS = ['Attendance', 'Livestock', 'Milk', 'Expenses'] as const;
+const TABS = ['Payroll', 'Livestock', 'Milk', 'Expenses'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function ReportDetailPage() {
@@ -23,7 +23,7 @@ export default function ReportDetailPage() {
   const [report, setReport] = useState<ReportDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('Attendance');
+  const [activeTab, setActiveTab] = useState<Tab>('Payroll');
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -130,8 +130,8 @@ export default function ReportDetailPage() {
         </div>
 
         <div className="p-4">
-          {activeTab === 'Attendance' && (
-            <AttendanceTab report={report} />
+          {activeTab === 'Payroll' && (
+            <PayrollTab report={report} />
           )}
           {activeTab === 'Livestock' && (
             <LivestockTab livestock={report.livestock} />

@@ -32,6 +32,8 @@ export default function ExpensesTab({ expenses }: Props) {
             <th className="px-4 py-2 text-left font-medium">Date</th>
             <th className="px-4 py-2 text-left font-medium">Supplier / Contractor</th>
             <th className="px-4 py-2 text-left font-medium">Ref No</th>
+            <th className="px-4 py-2 text-left font-medium">Product / Service</th>
+            <th className="px-4 py-2 text-left font-medium">Category</th>
             <th className="px-4 py-2 text-right font-medium">Cost</th>
           </tr>
         </thead>
@@ -42,6 +44,8 @@ export default function ExpensesTab({ expenses }: Props) {
               <td className="px-4 py-2 text-gray-700">{formatDate(e.date)}</td>
               <td className="px-4 py-2 text-gray-800">{e.supplierContractor ?? '—'}</td>
               <td className="px-4 py-2 text-gray-700">{e.receiptNo ?? '—'}</td>
+              <td className="px-4 py-2 text-gray-700">{e.description ?? '—'}</td>
+              <td className="px-4 py-2 text-gray-700">{e.categoryName ?? '—'}</td>
               <td className="px-4 py-2 text-right text-gray-900 font-medium">
                 {formatMoney(Number(e.cost))}
               </td>
@@ -50,7 +54,7 @@ export default function ExpensesTab({ expenses }: Props) {
         </tbody>
         <tfoot>
           <tr className="bg-gray-100 font-bold text-gray-800">
-            <td className="px-4 py-2" colSpan={3}></td>
+            <td className="px-4 py-2" colSpan={5}></td>
             <td className="px-4 py-2 text-right">TOTAL</td>
             <td className="px-4 py-2 text-right">{formatMoney(total)}</td>
           </tr>

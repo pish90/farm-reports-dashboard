@@ -6,19 +6,9 @@ export interface ReportDto {
   status: 'DRAFT' | 'SUBMITTED';
   submittedAt: string | null;
   createdAt: string;
-  attendance: AttendanceRecordDto[] | null;
   livestock: LivestockRecordDto[] | null;
   milk: MilkRecordDto[] | null;
   expenses: ExpenseRecordDto[] | null;
-}
-
-export interface AttendanceRecordDto {
-  id: number;
-  workerId: number;
-  workerName: string;
-  dayOfMonth: number;
-  present: boolean;
-  notes: string | null;
 }
 
 export interface LivestockRecordDto {
@@ -42,6 +32,29 @@ export interface ExpenseRecordDto {
   supplierContractor: string | null;
   receiptNo: string | null;
   cost: number;
+  description: string | null;
+  categoryName: string | null;
+}
+
+export interface ExpenseListItemDto {
+  id: number;
+  reportId: number;
+  farmId: number;
+  farmName: string;
+  year: number;
+  month: number;
+  date: string;        // ISO: YYYY-MM-DD
+  receiptNo: string | null;
+  supplierContractor: string | null;
+  description: string | null;
+  categoryName: string | null;
+  cost: number;
+}
+
+export interface ExpenseCategoryDto {
+  id: number;
+  accountCode: string;
+  accountName: string;
 }
 
 export interface FarmSummaryDto {
@@ -61,7 +74,7 @@ export interface FarmLiveStatusDto {
   reportStatus: 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED';
   reportId: number | null;
   activeWorkers: number;
-  attendanceDaysRecorded: number;
+  payrollEntriesRecorded: number;
   milkTotalLitres: number;
   expenseCount: number;
   expenseTotal: number;
@@ -232,6 +245,14 @@ export interface PayrollEntryRequest {
   notes: string | null;
 }
 
+export interface EmployeeAnnualPayrollDto {
+  employeeId: number;
+  employeeName: string;
+  lsNumber: string | null;
+  status: string;
+  ledger: EmployeeLedgerDto;
+}
+
 export interface PayrollSummaryDto {
   farmId: number;
   year: number;
@@ -256,6 +277,8 @@ export interface CasualLabourerDto {
   photoMimeType: string | null;
   jobTitle: string | null;
   departmentName: string | null;
+  isSalaried: boolean;
+  isCasual: boolean;
 }
 
 export interface CasualLabourerRequest {
@@ -330,15 +353,18 @@ export interface CasualPayrollEntryDto {
   outstanding: number;
 }
 
+// ── Milk summary ─────────────────────────────────────────────────────────
+
+export interface MilkSummaryDto {
+  farmId: number;
+  year: number;
+  month: number;
+  totalLitres: number;
+}
+
 // ── Farm settings ────────────────────────────────────────────────────────
 
 export interface DepartmentDto {
   id: number;
   name: string;
-}
-
-export interface LivestockTypeDto {
-  id: number;
-  category: string;
-  type: string;
 }

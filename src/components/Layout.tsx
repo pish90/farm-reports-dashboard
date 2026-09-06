@@ -5,13 +5,14 @@ import { useAuth } from '../auth/AuthContext';
 const BASE_NAV_LINKS = [
   { to: '/', label: 'Dashboard', icon: '🏠', roles: null },
   { to: '/reports', label: 'Reports', icon: '📋', roles: null },
+  { to: '/expenses', label: 'Expenses', icon: '💵', roles: null },
   { to: '/payroll', label: 'Payroll', icon: '💰', roles: null },
   { to: '/casual-labour', label: 'Casual Labour', icon: '👷', roles: null },
-  { to: '/settings', label: 'Farm Settings', icon: '⚙️', roles: null },
 ];
 
 const ADMIN_NAV_LINKS = [
   { to: '/employees', label: 'Employees', icon: '🧑‍🌾', roles: ['ADMIN'] },
+  { to: '/bulk-import', label: 'Bulk Import', icon: '📥', roles: ['ADMIN'] },
   { to: '/audit-logs', label: 'Audit Log', icon: '🔍', roles: ['ADMIN', 'MANAGER', 'OPERATIONS_MANAGER'] },
   { to: '/tools', label: 'Tools', icon: '🛠️', roles: ['ADMIN'] },
 ];
@@ -19,10 +20,11 @@ const ADMIN_NAV_LINKS = [
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/reports': 'Reports',
+  '/expenses': 'Expenses',
   '/payroll': 'Payroll',
   '/casual-labour': 'Casual Labour',
-  '/settings': 'Farm Settings',
   '/employees': 'Employees',
+  '/bulk-import': 'Bulk Import',
   '/audit-logs': 'Audit Log',
   '/tools': 'Tools',
 };

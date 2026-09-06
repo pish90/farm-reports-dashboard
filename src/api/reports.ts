@@ -1,5 +1,7 @@
 import client from './client';
-import type { FarmLiveStatusDto, FarmSummaryDto, PageDto, ReportDto } from '../types';
+import type {
+  ExpenseCategoryDto, ExpenseListItemDto, FarmLiveStatusDto, FarmSummaryDto, MilkSummaryDto, PageDto, ReportDto,
+} from '../types';
 
 export async function getFarmSummaries(): Promise<FarmSummaryDto[]> {
   const res = await client.get<{ data: FarmSummaryDto[] }>('/admin/farms');
@@ -27,6 +29,36 @@ export async function listReports(params: {
 
 export async function getReport(id: number): Promise<ReportDto> {
   const res = await client.get<{ data: ReportDto }>(`/reports/${id}`);
+  return res.data.data;
+}
+
+export async function getMilkSummaryRange(
+  farmId: number,
+  startYear: number,
+  startMonth: number,
+  endYear: number,
+  endMonth: number,
+): Promise<MilkSummaryDto[]> {
+  const res = await client.get<{ data: MilkSummaryDto[] }>('/reports/summary/milk/range', {
+    params: { farmId, startYear, startMonth, endYear, endMonth },
+  });
+  return res.data.data;
+}
+
+export async function listExpenses(params: {
+  farmId?: number;
+  year?: number;
+  month?: number;
+  categoryId?: number;
+  page?: number;
+  size?: number;
+}): Promise<PageDto<ExpenseListItemDto>> {
+  const res = await client.get<{ data: PageDto<ExpenseListItemDto> }>('/admin/expenses', { params });
+  return res.data.data;
+}
+
+export async function getExpenseCategories(): Promise<ExpenseCategoryDto[]> {
+  const res = await client.get<{ data: ExpenseCategoryDto[] }>('/lookup/expense-categories');
   return res.data.data;
 }
 
