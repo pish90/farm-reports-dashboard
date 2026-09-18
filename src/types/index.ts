@@ -154,6 +154,7 @@ export interface ImportResult {
   success: boolean;
   totalRows: number;
   importedCount: number;
+  skippedCount: number;
   errors: ImportRowError[];
 }
 

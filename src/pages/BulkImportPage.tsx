@@ -28,10 +28,12 @@ const TABS: { key: ImportKind; label: string; accept: string; yearMode: YearMode
 function ImportResultBanner({ result }: { result: ImportResult | EmployeeCsvImportResult }) {
   if (result.success) {
     const mergedCount = 'mergedCount' in result ? result.mergedCount : 0;
+    const skippedCount = 'skippedCount' in result ? result.skippedCount : 0;
     return (
       <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
         Imported {result.importedCount} of {result.totalRows} row(s) successfully.
         {mergedCount > 0 && ` Updated ${mergedCount} existing employee(s) — filled in any blank fields and merged a new employment type where the row had one.`}
+        {skippedCount > 0 && ` Skipped ${skippedCount} row(s) already imported previously — no changes made to them.`}
       </div>
     );
   }
