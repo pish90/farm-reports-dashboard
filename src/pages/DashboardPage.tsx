@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getFarmEmployees, getMasterEmployeeRegistry } from '../api/employees';
-import { getFarmSummaries, getLiveStatus } from '../api/reports';
+import { getFarmSummaries, getLiveStatus, listReports } from '../api/reports';
 import { useAuth } from '../auth/AuthContext';
 import EmployeeLedgerSection from '../components/EmployeeLedgerSection';
 import StatusBadge from '../components/StatusBadge';
@@ -220,6 +220,8 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [autoJumped, setAutoJumped] = useState(false);
+  const [jumpNotice, setJumpNotice] = useState<string | null>(null);
 
   useEffect(() => {
     // This screen needs every employee (headcount stats + the ledger-lookup picker below),
@@ -240,10 +242,31 @@ export default function DashboardPage() {
         setFarms(farmData);
         setLiveStatus(liveStatusData);
         setEmployees(employeeData);
+
+        // The selector defaults to the real-world current month, which is often empty
+        // (no report started yet) — jump once to whichever month actually has the most
+        // recent report, so the dashboard doesn't just look empty on a fresh month.
+        if (!autoJumped && liveStatusData.length > 0
+            && liveStatusData.every((f) => f.reportStatus === 'NOT_STARTED')) {
+          setAutoJumped(true);
+          listReports({ page: 0, size: 1 })
+            .then((res) => {
+              const latest = res.content[0];
+              if (latest && (latest.year !== year || latest.month !== month)) {
+                setJumpNotice(
+                  `No report started yet for ${MONTH_NAMES[month - 1]} ${year} — showing `
+                  + `${MONTH_NAMES[latest.month - 1]} ${latest.year}, the most recent with data.`,
+                );
+                setYear(latest.year);
+                setMonth(latest.month);
+              }
+            })
+            .catch(() => {});
+        }
       })
       .catch(() => setError('Failed to load farm data.'))
       .finally(() => setLoading(false));
-  }, [isAdmin, user?.farmId, year, month]);
+  }, [isAdmin, user?.farmId, year, month, autoJumped]);
 
   const totalMilk = farms.reduce((sum, f) => sum + f.totalMilkThisMonth, 0);
   const totalExpenses = farms.reduce((sum, f) => sum + f.totalExpensesThisMonth, 0);
@@ -282,18 +305,32 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-sm text-gray-500">Overview for {MONTH_NAMES[month - 1]} {year}</p>
         <div className="flex gap-2 sm:ml-auto">
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={selectClass}>
+          <select
+            value={year}
+            onChange={(e) => { setJumpNotice(null); setYear(Number(e.target.value)); }}
+            className={selectClass}
+          >
             {YEAR_OPTIONS.map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={selectClass}>
+          <select
+            value={month}
+            onChange={(e) => { setJumpNotice(null); setMonth(Number(e.target.value)); }}
+            className={selectClass}
+          >
             {MONTH_NAMES.map((name, idx) => (
               <option key={idx + 1} value={idx + 1}>{name}</option>
             ))}
           </select>
         </div>
       </div>
+
+      {jumpNotice && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-sm text-blue-800">
+          {jumpNotice}
+        </div>
+      )}
 
       {/* Quick stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
