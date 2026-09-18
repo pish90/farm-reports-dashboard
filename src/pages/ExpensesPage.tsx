@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getExpenseCategories, getFarmSummaries, listExpenses } from '../api/reports';
+import { deleteExpense, getExpenseCategories, getFarmSummaries, listExpenses } from '../api/reports';
 import Pagination from '../components/Pagination';
 import { formatMoney } from '../lib/format';
+import { useAuth } from '../auth/AuthContext';
 import type { ExpenseCategoryDto, ExpenseListItemDto, FarmSummaryDto, PageDto } from '../types';
 
 const PAGE_SIZE = 10;
@@ -25,12 +26,15 @@ function formatDate(iso: string): string {
 
 export default function ExpensesPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
 
   const [farms, setFarms] = useState<FarmSummaryDto[]>([]);
   const [categories, setCategories] = useState<ExpenseCategoryDto[]>([]);
   const [result, setResult] = useState<PageDto<ExpenseListItemDto> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [farmFilter, setFarmFilter] = useState<string>('');
   const [yearFilter, setYearFilter] = useState<string>('');
@@ -43,7 +47,7 @@ export default function ExpensesPage() {
     getExpenseCategories().catch(() => null).then((data) => { if (data) setCategories(data); });
   }, []);
 
-  useEffect(() => {
+  function loadExpenses() {
     setLoading(true);
     setError(null);
     const params: Parameters<typeof listExpenses>[0] = { page, size: PAGE_SIZE };
@@ -52,11 +56,30 @@ export default function ExpensesPage() {
     if (monthFilter) params.month = Number(monthFilter);
     if (categoryFilter) params.categoryId = Number(categoryFilter);
 
-    listExpenses(params)
+    return listExpenses(params)
       .then(setResult)
       .catch(() => setError('Failed to load expenses.'))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadExpenses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [farmFilter, yearFilter, monthFilter, categoryFilter, page]);
+
+  async function handleDelete(expense: ExpenseListItemDto) {
+    const label = expense.description || expense.supplierContractor || `#${expense.id}`;
+    if (!confirm(`Permanently delete this expense (${label}, ${formatMoney(Number(expense.cost))})? This cannot be undone.`)) return;
+    setDeletingId(expense.id);
+    try {
+      await deleteExpense(expense.id);
+      await loadExpenses();
+    } catch {
+      setError('Failed to delete expense.');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   function updateFilter(setter: (v: string) => void) {
     return (v: string) => { setter(v); setPage(0); };
@@ -137,15 +160,12 @@ export default function ExpensesPage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Product / Service</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Category</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Amount</th>
+                  <th className="px-4 py-3 font-medium text-gray-600 whitespace-nowrap text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {expenses.map((e) => (
-                  <tr
-                    key={e.id}
-                    onClick={() => navigate(`/reports/${e.reportId}`)}
-                    className="hover:bg-green-50 cursor-pointer transition-colors"
-                  >
+                  <tr key={e.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{e.farmName}</td>
                     <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(e.date)}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{e.receiptNo ?? '—'}</td>
@@ -155,6 +175,23 @@ export default function ExpensesPage() {
                     <td className="px-4 py-3 text-right text-gray-900 font-medium whitespace-nowrap">
                       {formatMoney(Number(e.cost))}
                     </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => navigate(`/reports/${e.reportId}`)}
+                        className="text-sm text-green-700 hover:text-green-900 font-medium"
+                      >
+                        View report
+                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDelete(e)}
+                          disabled={deletingId === e.id}
+                          className="ml-3 text-sm text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
+                        >
+                          {deletingId === e.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -162,6 +199,7 @@ export default function ExpensesPage() {
                 <tr className="bg-gray-50 font-semibold text-gray-800 border-t border-gray-200">
                   <td className="px-4 py-3" colSpan={6}>Total (this page)</td>
                   <td className="px-4 py-3 text-right">{formatMoney(total)}</td>
+                  <td className="px-4 py-3" />
                 </tr>
               </tfoot>
             </table>

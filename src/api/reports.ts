@@ -57,6 +57,10 @@ export async function listExpenses(params: {
   return res.data.data;
 }
 
+export async function deleteExpense(id: number): Promise<void> {
+  await client.delete(`/admin/expenses/${id}`);
+}
+
 export async function getExpenseCategories(): Promise<ExpenseCategoryDto[]> {
   const res = await client.get<{ data: ExpenseCategoryDto[] }>('/lookup/expense-categories');
   return res.data.data;
