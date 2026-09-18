@@ -4,6 +4,7 @@ import {
   deleteWorkSession, downloadCasualExport, getCasualLabourerSummary, getCasualLabourers,
   getMonthlyCasualPayroll, getWorkSessions, recordCasualPayment, updateCasualLabourer, updateWorkSession,
 } from '../api/casual';
+import { getFarmEmployees } from '../api/employees';
 import { getDepartments } from '../api/farms';
 import { useFarmScope } from '../auth/useFarmScope';
 import Modal from '../components/Modal';
@@ -11,7 +12,7 @@ import Pagination from '../components/Pagination';
 import { formatDate, formatMoney, MONTH_NAMES } from '../lib/format';
 import type {
   CasualLabourerDto, CasualLabourerSummaryDto, CasualPayrollEntryDto, CasualWorkSessionDto, DepartmentDto,
-  PageDto,
+  EmployeeDto, PageDto,
 } from '../types';
 
 const now = new Date();
@@ -112,22 +113,44 @@ export default function CasualLabourPage() {
 
 // ── Labourers ────────────────────────────────────────────────────────────
 
+const LABOURERS_PAGE_SIZE = 10;
+
 function LabourersTab({ farmId, showToast }: { farmId: number; showToast: (m: string) => void }) {
-  const [labourers, setLabourers] = useState<CasualLabourerDto[]>([]);
+  const [result, setResult] = useState<PageDto<EmployeeDto> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<CasualLabourerDto | 'new' | null>(null);
+  const [editing, setEditing] = useState<EmployeeDto | 'new' | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(0); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   function load() {
     setLoading(true);
     setError(null);
-    getCasualLabourers(farmId)
-      .then(setLabourers)
+    getFarmEmployees(farmId, {
+      status: 'ACTIVE',
+      search: debouncedSearch || undefined,
+      page,
+      size: LABOURERS_PAGE_SIZE,
+    })
+      .then(setResult)
       .catch(() => setError('Failed to load labourers.'))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [farmId]);
+  useEffect(() => { setPage(0); }, [farmId]);
+  useEffect(load, [farmId, debouncedSearch, page]);
+
+  const labourers = result?.content ?? [];
+
+  function changePage(next: number) {
+    setPage(next);
+  }
 
   async function handleDeactivate(id: number) {
     if (!confirm('Deactivate this labourer?')) return;
@@ -142,16 +165,26 @@ function LabourersTab({ farmId, showToast }: { farmId: number; showToast: (m: st
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center gap-3">
         <h3 className="text-sm font-semibold text-gray-700">Active casual labourers</h3>
-        <button onClick={() => setEditing('new')} className={primaryBtn}>Add labourer</button>
+        <input
+          type="text"
+          placeholder="Search name, LS number…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+        />
+        {result && <span className="text-xs text-gray-400">{result.totalElements} labourers</span>}
+        <button onClick={() => setEditing('new')} className={`${primaryBtn} ml-auto`}>Add labourer</button>
       </div>
       {loading ? (
         <Spinner />
       ) : error ? (
         <div className="p-6 text-red-600 text-sm">{error}</div>
       ) : labourers.length === 0 ? (
-        <div className="p-10 text-center text-gray-400 text-sm">No active casual labourers.</div>
+        <div className="p-10 text-center text-gray-400 text-sm">
+          {debouncedSearch ? 'No labourers match your search.' : 'No active casual labourers.'}
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -170,7 +203,7 @@ function LabourersTab({ farmId, showToast }: { farmId: number; showToast: (m: st
               {labourers.map((l) => (
                 <tr key={l.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs whitespace-nowrap">{l.lsNumber ?? '—'}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{l.name}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{l.fullName}</td>
                   <td className="px-4 py-3 text-gray-500">{l.phone ?? '—'}</td>
                   <td className="px-4 py-3">
                     <EmploymentTypeBadges isSalaried={l.isSalaried} isCasual={l.isCasual} />
@@ -192,6 +225,17 @@ function LabourersTab({ farmId, showToast }: { farmId: number; showToast: (m: st
         </div>
       )}
 
+      {result && labourers.length > 0 && (
+        <Pagination
+          page={result.page}
+          pageSize={LABOURERS_PAGE_SIZE}
+          totalPages={result.totalPages}
+          totalElements={result.totalElements}
+          onPrev={() => changePage(page - 1)}
+          onNext={() => changePage(page + 1)}
+        />
+      )}
+
       {editing && (
         <LabourerModal
           farmId={farmId}
@@ -208,7 +252,7 @@ function LabourerModal({
   farmId, labourer, onClose, onSaved,
 }: {
   farmId: number;
-  labourer: CasualLabourerDto | null;
+  labourer: EmployeeDto | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -287,7 +331,7 @@ function LabourerModal({
   }
 
   return (
-    <Modal title={isNew ? 'Add labourer' : labourer.name} onClose={onClose}>
+    <Modal title={isNew ? 'Add labourer' : labourer.fullName} onClose={onClose}>
       {labourer?.lsNumber && <p className="text-xs text-gray-400 font-mono -mt-2">{labourer.lsNumber}</p>}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
@@ -620,12 +664,16 @@ function SessionModal({
 
 // ── Monthly payroll ─────────────────────────────────────────────────────
 
+const MONTHLY_PAGE_SIZE = 10;
+
 function MonthlyTab({ farmId, showToast }: { farmId: number; showToast: (m: string) => void }) {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [entries, setEntries] = useState<CasualPayrollEntryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
 
   function load() {
     setLoading(true);
@@ -637,6 +685,7 @@ function MonthlyTab({ farmId, showToast }: { farmId: number; showToast: (m: stri
   }
 
   useEffect(load, [farmId, year, month]);
+  useEffect(() => { setPage(0); }, [search, farmId, year, month]);
 
   async function handleExport() {
     try {
@@ -645,6 +694,12 @@ function MonthlyTab({ farmId, showToast }: { farmId: number; showToast: (m: stri
       showToast('Export failed.');
     }
   }
+
+  const filtered = search.trim()
+    ? entries.filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : entries;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / MONTHLY_PAGE_SIZE));
+  const visible = filtered.slice(page * MONTHLY_PAGE_SIZE, (page + 1) * MONTHLY_PAGE_SIZE);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -655,15 +710,25 @@ function MonthlyTab({ farmId, showToast }: { farmId: number; showToast: (m: stri
         <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={selectClass}>
           {MONTH_NAMES.map((name, idx) => <option key={idx + 1} value={idx + 1}>{name}</option>)}
         </select>
+        <input
+          type="text"
+          placeholder="Search name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+        />
         <button onClick={handleExport} className={`${secondaryBtn} ml-auto`}>Export Excel</button>
       </div>
       {loading ? (
         <Spinner />
       ) : error ? (
         <div className="p-6 text-red-600 text-sm">{error}</div>
-      ) : entries.length === 0 ? (
-        <div className="p-10 text-center text-gray-400 text-sm">No casual payroll data for this period.</div>
+      ) : filtered.length === 0 ? (
+        <div className="p-10 text-center text-gray-400 text-sm">
+          {search ? 'No labourers match your search.' : 'No casual payroll data for this period.'}
+        </div>
       ) : (
+        <>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -676,7 +741,7 @@ function MonthlyTab({ farmId, showToast }: { farmId: number; showToast: (m: stri
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {entries.map((e) => (
+              {visible.map((e) => (
                 <tr key={e.labourerId}>
                   <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{e.name}</td>
                   <td className="px-4 py-3">{e.daysPresent}</td>
@@ -688,6 +753,15 @@ function MonthlyTab({ farmId, showToast }: { farmId: number; showToast: (m: stri
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={page}
+          pageSize={MONTHLY_PAGE_SIZE}
+          totalPages={totalPages}
+          totalElements={filtered.length}
+          onPrev={() => setPage((p) => p - 1)}
+          onNext={() => setPage((p) => p + 1)}
+        />
+        </>
       )}
     </div>
   );

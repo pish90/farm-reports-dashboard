@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { getFarmAnnualPayroll } from '../../api/payroll';
+import Pagination from '../../components/Pagination';
 import { formatMoney, monthName } from '../../lib/format';
 import type { EmployeeAnnualPayrollDto, ReportDto } from '../../types';
 
@@ -7,11 +8,15 @@ interface Props {
   report: ReportDto;
 }
 
+const PAGE_SIZE = 10;
+
 export default function PayrollTab({ report }: Props) {
   const [rows, setRows] = useState<EmployeeAnnualPayrollDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     setLoading(true);
@@ -21,6 +26,8 @@ export default function PayrollTab({ report }: Props) {
       .catch(() => setError('Failed to load payroll.'))
       .finally(() => setLoading(false));
   }, [report.farmId, report.year]);
+
+  useEffect(() => { setPage(0); }, [search]);
 
   if (loading) {
     return <div className="py-12 text-center text-gray-400 text-sm">Loading payroll…</div>;
@@ -38,11 +45,31 @@ export default function PayrollTab({ report }: Props) {
     );
   }
 
+  const filtered = search.trim()
+    ? rows.filter((r) =>
+        r.employeeName.toLowerCase().includes(search.trim().toLowerCase())
+        || (r.lsNumber ?? '').toLowerCase().includes(search.trim().toLowerCase()))
+    : rows;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
   return (
     <div className="space-y-3">
-      <p className="text-xs text-gray-400">
-        Each employee's payroll for {report.year} — not just this report's month.
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-xs text-gray-400">
+          Each employee's payroll for {report.year} — not just this report's month.
+        </p>
+        <input
+          type="text"
+          placeholder="Search name, LS number…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="ml-auto border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+        />
+      </div>
+      {filtered.length === 0 ? (
+        <div className="py-12 text-center text-gray-400 text-sm">No employees match your search.</div>
+      ) : (
       <div className="overflow-x-auto border border-gray-200 rounded-lg">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -58,7 +85,7 @@ export default function PayrollTab({ report }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {rows.map((r) => (
+            {visible.map((r) => (
               <Fragment key={r.employeeId}>
                 <tr className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500 font-mono text-xs whitespace-nowrap">{r.lsNumber ?? '—'}</td>
@@ -116,6 +143,17 @@ export default function PayrollTab({ report }: Props) {
           </tbody>
         </table>
       </div>
+      )}
+      {filtered.length > 0 && (
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalPages={totalPages}
+          totalElements={filtered.length}
+          onPrev={() => setPage((p) => p - 1)}
+          onNext={() => setPage((p) => p + 1)}
+        />
+      )}
     </div>
   );
 }

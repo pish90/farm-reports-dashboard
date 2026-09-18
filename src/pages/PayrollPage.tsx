@@ -30,6 +30,7 @@ export default function PayrollPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!farmId) return;
@@ -96,6 +97,12 @@ export default function PayrollPage() {
     );
   }
 
+  const filteredRows = search.trim()
+    ? rows.filter((r) =>
+        r.employeeName.toLowerCase().includes(search.trim().toLowerCase())
+        || (r.lsNumber ?? '').toLowerCase().includes(search.trim().toLowerCase()))
+    : rows;
+
   return (
     <div className="space-y-5">
       {/* Filter bar */}
@@ -118,6 +125,16 @@ export default function PayrollPage() {
           ))}
         </select>
 
+        {rows.length > 10 && (
+          <input
+            type="text"
+            placeholder="Search name, LS number…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+          />
+        )}
+
         {toast && <span className="text-sm text-green-700 ml-auto">{toast}</span>}
       </div>
 
@@ -131,6 +148,8 @@ export default function PayrollPage() {
           <div className="p-6 text-red-600 text-sm">{error}</div>
         ) : rows.length === 0 ? (
           <div className="p-10 text-center text-gray-400 text-sm">No payroll entries for this period.</div>
+        ) : filteredRows.length === 0 ? (
+          <div className="p-10 text-center text-gray-400 text-sm">No employees match your search.</div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -148,7 +167,7 @@ export default function PayrollPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {rows.map((r) => (
+                  {filteredRows.map((r) => (
                     <tr key={r.employeeId}>
                       <td className="px-4 py-2 text-gray-500 font-mono text-xs whitespace-nowrap">{r.lsNumber ?? '—'}</td>
                       <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap">{r.employeeName}</td>
