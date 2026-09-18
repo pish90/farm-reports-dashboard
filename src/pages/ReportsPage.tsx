@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { getFarmSummaries, listReports } from '../api/reports';
 import MilkProductionChart from '../components/MilkProductionChart';
 import Pagination from '../components/Pagination';
-import StatusBadge from '../components/StatusBadge';
 import type { FarmSummaryDto, PageDto, ReportDto } from '../types';
 
 const PAGE_SIZE = 10;
@@ -16,12 +15,6 @@ const MONTH_NAMES = [
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'SUBMITTED', label: 'Submitted' },
-];
-
 export default function ReportsPage() {
   const navigate = useNavigate();
 
@@ -33,7 +26,6 @@ export default function ReportsPage() {
   const [farmFilter, setFarmFilter] = useState<string>('');
   const [yearFilter, setYearFilter] = useState<string>('');
   const [monthFilter, setMonthFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
   const [page, setPage] = useState(0);
 
   // Load farms for the dropdown map
@@ -50,13 +42,12 @@ export default function ReportsPage() {
     if (farmFilter) params.farmId = Number(farmFilter);
     if (yearFilter) params.year = Number(yearFilter);
     if (monthFilter) params.month = Number(monthFilter);
-    if (statusFilter) params.status = statusFilter;
 
     listReports(params)
       .then(setResult)
       .catch(() => setError('Failed to load reports.'))
       .finally(() => setLoading(false));
-  }, [farmFilter, yearFilter, monthFilter, statusFilter, page]);
+  }, [farmFilter, yearFilter, monthFilter, page]);
 
   function updateFilter(setter: (v: string) => void) {
     return (v: string) => { setter(v); setPage(0); };
@@ -117,20 +108,10 @@ export default function ReportsPage() {
           ))}
         </select>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => updateFilter(setStatusFilter)(e.target.value)}
-          className={selectClass}
-        >
-          {STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-
-        {(farmFilter || yearFilter || monthFilter || statusFilter) && (
+        {(farmFilter || yearFilter || monthFilter) && (
           <button
             onClick={() => {
-              setFarmFilter(''); setYearFilter(''); setMonthFilter(''); setStatusFilter(''); setPage(0);
+              setFarmFilter(''); setYearFilter(''); setMonthFilter(''); setPage(0);
             }}
             className="text-sm text-gray-500 hover:text-red-600 transition-colors"
           >
@@ -159,8 +140,7 @@ export default function ReportsPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-600">ID</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Farm</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Period</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Submitted At</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Created</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -177,13 +157,8 @@ export default function ReportsPage() {
                   <td className="px-4 py-3 text-gray-700">
                     {MONTH_NAMES[r.month - 1]} {r.year}
                   </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={r.status} />
-                  </td>
                   <td className="px-4 py-3 text-gray-500">
-                    {r.submittedAt
-                      ? new Date(r.submittedAt).toLocaleString()
-                      : '—'}
+                    {new Date(r.createdAt).toLocaleDateString()}
                   </td>
                 </tr>
               ))}

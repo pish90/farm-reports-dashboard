@@ -69,8 +69,8 @@ function FarmCard({
           </div>
         )}
         <div className="col-span-2">
-          <dt className="text-xs text-gray-400">Last Submitted</dt>
-          <dd className="text-sm text-gray-700 mt-0.5">{formatDate(farm.lastSubmittedAt)}</dd>
+          <dt className="text-xs text-gray-400">Last Report</dt>
+          <dd className="text-sm text-gray-700 mt-0.5">{formatDate(farm.lastReportAt)}</dd>
         </div>
       </dl>
     </div>

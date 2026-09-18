@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { downloadExport, getReport } from '../api/reports';
-import StatusBadge from '../components/StatusBadge';
 import type { ReportDto } from '../types';
 import ExpensesTab from './report-tabs/ExpensesTab';
 import LivestockTab from './report-tabs/LivestockTab';
@@ -87,14 +86,8 @@ export default function ReportDetailPage() {
             <h2 className="text-xl font-bold text-gray-900">
               {monthName} {report.year}
             </h2>
-            <StatusBadge status={report.status} />
           </div>
           <p className="text-sm text-gray-500">Farm #{report.farmId} &middot; Report #{report.id}</p>
-          {report.submittedAt && (
-            <p className="text-xs text-gray-400">
-              Submitted: {new Date(report.submittedAt).toLocaleString()}
-            </p>
-          )}
         </div>
 
         <button

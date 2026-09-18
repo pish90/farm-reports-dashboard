@@ -19,7 +19,6 @@ export async function listReports(params: {
   farmId?: number;
   year?: number;
   month?: number;
-  status?: string;
   page?: number;
   size?: number;
 }): Promise<PageDto<ReportDto>> {

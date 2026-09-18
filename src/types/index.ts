@@ -3,8 +3,6 @@ export interface ReportDto {
   farmId: number;
   year: number;
   month: number;
-  status: 'DRAFT' | 'SUBMITTED';
-  submittedAt: string | null;
   createdAt: string;
   livestock: LivestockRecordDto[] | null;
   milk: MilkRecordDto[] | null;
@@ -60,7 +58,7 @@ export interface ExpenseCategoryDto {
 export interface FarmSummaryDto {
   farmId: number;
   farmName: string;
-  lastSubmittedAt: string | null;
+  lastReportAt: string | null;
   reportsThisYear: number;
   totalMilkThisMonth: number;
   totalExpensesThisMonth: number;
@@ -71,7 +69,7 @@ export interface FarmLiveStatusDto {
   farmName: string;
   year: number;
   month: number;
-  reportStatus: 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED';
+  reportStatus: 'NOT_STARTED' | 'DRAFT';
   reportId: number | null;
   activeWorkers: number;
   payrollEntriesRecorded: number;
