@@ -28,12 +28,12 @@ const TABS: { key: ImportKind; label: string; accept: string; yearMode: YearMode
 function ImportResultBanner({ result }: { result: ImportResult | EmployeeCsvImportResult }) {
   if (result.success) {
     const mergedCount = 'mergedCount' in result ? result.mergedCount : 0;
-    const skippedCount = 'skippedCount' in result ? result.skippedCount : 0;
+    const updatedCount = 'updatedCount' in result ? result.updatedCount : 0;
     return (
       <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
         Imported {result.importedCount} of {result.totalRows} row(s) successfully.
-        {mergedCount > 0 && ` Updated ${mergedCount} existing employee(s) — filled in any blank fields and merged a new employment type where the row had one.`}
-        {skippedCount > 0 && ` Skipped ${skippedCount} row(s) already imported previously — no changes made to them.`}
+        {mergedCount > 0 && ` Updated ${mergedCount} existing employee(s) with any new details the row had, and merged a new employment type where the row had one.`}
+        {updatedCount > 0 && ` Amended ${updatedCount} row(s) already on file with the values from this upload.`}
       </div>
     );
   }
@@ -147,7 +147,7 @@ export default function BulkImportPage() {
         <div className="flex items-start justify-between gap-4">
           <p className="text-sm text-gray-500">
             {tab === 'employees' &&
-              'Upload the employee_import_template (.csv or .xlsx). Columns: farmName, firstName, lastName, employmentType (SALARIED, CASUAL, or BOTH), phone, NationalID, Gender, DateofBirth, startDate, jobTitle. A row matching an existing employee (by farm + name) never errors — it fills in any of that employee\'s fields that are currently blank (e.g. to restore phone/DOB lost in a data cleanup) and merges in a new employment type if the row has one. It never overwrites a field that already has a value.'}
+              'Upload the employee_import_template (.csv or .xlsx). Columns: farmName, firstName, lastName, employmentType (SALARIED, CASUAL, or BOTH), phone, NationalID, Gender, DateofBirth, startDate, jobTitle. A row matching an existing employee (by farm + name) never errors — it amends that employee with any non-blank cell in the row (so re-uploading the template with corrected details updates them) and merges in a new employment type if the row has one. A blank cell never erases an existing value.'}
             {tab === 'livestock' &&
               'Upload the livestock_import_template (.xlsx). The file has no year column, so pick the year these figures belong to.'}
             {tab === 'milk' &&
@@ -155,7 +155,7 @@ export default function BulkImportPage() {
             {tab === 'employeePay' &&
               'Upload the Employee pay_import sheet (.xlsx) — one row per month, Earned/Paid per employee (by LS number). The file has no year column and month labels repeat, so pick the year and month the FIRST row represents; later rows are assumed to follow in sequence.'}
             {tab === 'expenses' &&
-              'Upload the expenses_import_template (.csv or .xlsx). Columns: farm, date, ID, supplier, product/service, category, amount. Each row is added as a new expense on the report for that farm/month — nothing already recorded is touched. ID is your own receipt/voucher number and must be unique per farm; re-uploading a row with an ID already on file is rejected rather than creating a duplicate. An unrecognized category is imported blank rather than erroring.'}
+              'Upload the expenses_import_template (.csv or .xlsx). Columns: farm, date, ID, supplier, product/service, category, amount. ID is your own receipt/voucher number, per farm, and doubles as the amend key: a new ID is added as a new expense, and an ID already on file is updated in place with this row\'s values (re-uploading the template with corrected figures is how you amend previously-imported expenses). An unrecognized category is imported blank rather than erroring.'}
           </p>
           <button
             onClick={handleDownloadTemplate}

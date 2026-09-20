@@ -60,6 +60,18 @@ export async function deleteExpense(id: number): Promise<void> {
   await client.delete(`/admin/expenses/${id}`);
 }
 
+export async function updateExpense(id: number, payload: {
+  date: string;
+  supplierContractor: string | null;
+  receiptNo: string | null;
+  cost: number;
+  description: string | null;
+  categoryId: number | null;
+}): Promise<ExpenseListItemDto> {
+  const res = await client.put<{ data: ExpenseListItemDto }>(`/admin/expenses/${id}`, payload);
+  return res.data.data;
+}
+
 export async function getExpenseCategories(): Promise<ExpenseCategoryDto[]> {
   const res = await client.get<{ data: ExpenseCategoryDto[] }>('/lookup/expense-categories');
   return res.data.data;

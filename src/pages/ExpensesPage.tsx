@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deleteExpense, getExpenseCategories, getFarmSummaries, listExpenses } from '../api/reports';
+import { deleteExpense, getExpenseCategories, getFarmSummaries, listExpenses, updateExpense } from '../api/reports';
+import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import { formatMoney } from '../lib/format';
 import { useAuth } from '../auth/AuthContext';
@@ -18,10 +19,102 @@ const YEAR_OPTIONS = [currentYear - 2, currentYear - 1, currentYear, currentYear
 
 const selectClass =
   'border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
+const inputClass =
+  'w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+const labelClass = 'block text-xs font-medium text-gray-500 mb-1';
+const primaryBtn = 'px-4 py-2 text-sm rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-40 transition-colors';
+const secondaryBtn = 'px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors';
 
 function formatDate(iso: string): string {
   const [year, month, day] = iso.split('-');
   return `${day}/${month}/${year}`;
+}
+
+interface EditExpenseModalProps {
+  expense: ExpenseListItemDto;
+  categories: ExpenseCategoryDto[];
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function EditExpenseModal({ expense, categories, onClose, onSaved }: EditExpenseModalProps) {
+  const [date, setDate] = useState(expense.date);
+  const [supplier, setSupplier] = useState(expense.supplierContractor ?? '');
+  const [receiptNo, setReceiptNo] = useState(expense.receiptNo ?? '');
+  const [cost, setCost] = useState(String(expense.cost));
+  const [description, setDescription] = useState(expense.description ?? '');
+  const [categoryId, setCategoryId] = useState<string>(
+    categories.find((c) => c.accountName === expense.categoryName)?.id.toString() ?? '',
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateExpense(expense.id, {
+        date,
+        supplierContractor: supplier.trim() || null,
+        receiptNo: receiptNo.trim() || null,
+        cost: Number(cost) || 0,
+        description: description.trim() || null,
+        categoryId: categoryId ? Number(categoryId) : null,
+      });
+      onSaved();
+    } catch {
+      setError('Failed to save changes. Please try again.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title={`Edit Expense · ${expense.farmName}`} onClose={onClose}>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className={labelClass}>Date</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>Amount</label>
+          <input
+            type="number" step="0.01" min="0" value={cost}
+            onChange={(e) => setCost(e.target.value)} className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Ref No</label>
+          <input value={receiptNo} onChange={(e) => setReceiptNo(e.target.value)} className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>Category</label>
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
+            <option value="">— None —</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.accountName}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-2">
+          <label className={labelClass}>Supplier</label>
+          <input value={supplier} onChange={(e) => setSupplier(e.target.value)} className={inputClass} />
+        </div>
+        <div className="col-span-2">
+          <label className={labelClass}>Product / Service</label>
+          <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputClass} />
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <div className="flex justify-end gap-2 pt-2">
+        <button onClick={onClose} disabled={saving} className={secondaryBtn}>Cancel</button>
+        <button onClick={handleSave} disabled={saving} className={primaryBtn}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+      </div>
+    </Modal>
+  );
 }
 
 export default function ExpensesPage() {
@@ -35,6 +128,7 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingExpense, setEditingExpense] = useState<ExpenseListItemDto | null>(null);
 
   const [farmFilter, setFarmFilter] = useState<string>('');
   const [yearFilter, setYearFilter] = useState<string>('');
@@ -183,13 +277,21 @@ export default function ExpensesPage() {
                         View report
                       </button>
                       {isAdmin && (
-                        <button
-                          onClick={() => handleDelete(e)}
-                          disabled={deletingId === e.id}
-                          className="ml-3 text-sm text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
-                        >
-                          {deletingId === e.id ? 'Deleting…' : 'Delete'}
-                        </button>
+                        <>
+                          <button
+                            onClick={() => setEditingExpense(e)}
+                            className="ml-3 text-sm text-gray-600 hover:text-gray-900 font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(e)}
+                            disabled={deletingId === e.id}
+                            className="ml-3 text-sm text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
+                          >
+                            {deletingId === e.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -217,6 +319,15 @@ export default function ExpensesPage() {
           </>
         )}
       </div>
+
+      {editingExpense && (
+        <EditExpenseModal
+          expense={editingExpense}
+          categories={categories}
+          onClose={() => setEditingExpense(null)}
+          onSaved={() => { setEditingExpense(null); loadExpenses(); }}
+        />
+      )}
     </div>
   );
 }
