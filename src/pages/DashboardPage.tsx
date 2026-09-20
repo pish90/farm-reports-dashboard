@@ -26,10 +26,11 @@ function formatDate(iso: string | null): string {
 }
 
 function FarmCard({
-  farm, employeeCount,
+  farm, employeeCount, periodLabel,
 }: {
   farm: FarmSummaryDto;
   employeeCount?: { active: number; total: number };
+  periodLabel: string;
 }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
@@ -43,13 +44,13 @@ function FarmCard({
 
       <dl className="grid grid-cols-2 gap-3">
         <div className="bg-green-50 rounded-lg p-3">
-          <dt className="text-xs text-green-700 font-medium">Milk This Month</dt>
+          <dt className="text-xs text-green-700 font-medium">Milk ({periodLabel})</dt>
           <dd className="text-lg font-bold text-green-900 mt-0.5">
             {farm.totalMilkThisMonth.toFixed(1)} L
           </dd>
         </div>
         <div className="bg-amber-50 rounded-lg p-3">
-          <dt className="text-xs text-amber-700 font-medium">Expenses This Month</dt>
+          <dt className="text-xs text-amber-700 font-medium">Expenses ({periodLabel})</dt>
           <dd className="text-lg font-bold text-amber-900 mt-0.5">
             {formatMoney(farm.totalExpensesThisMonth)}
           </dd>
@@ -234,7 +235,7 @@ export default function DashboardPage() {
     ).then((res) => res.content);
 
     Promise.all([
-      getFarmSummaries(),
+      getFarmSummaries(year, month),
       getLiveStatus(year, month),
       employeesRequest.catch(() => []),
     ])
@@ -335,11 +336,11 @@ export default function DashboardPage() {
       {/* Quick stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
-          label={`Total Milk This Month (all farms)`}
+          label={`Total Milk — ${MONTH_NAMES[month - 1]} ${year} (all farms)`}
           value={`${totalMilk.toFixed(1)} L`}
         />
         <StatCard
-          label={`Total Expenses This Month (all farms)`}
+          label={`Total Expenses — ${MONTH_NAMES[month - 1]} ${year} (all farms)`}
           value={formatMoney(totalExpenses)}
         />
         {employees.length > 0 && (
@@ -361,7 +362,12 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {farms.map((farm) => (
-              <FarmCard key={farm.farmId} farm={farm} employeeCount={employeesByFarm.get(farm.farmId)} />
+              <FarmCard
+                key={farm.farmId}
+                farm={farm}
+                employeeCount={employeesByFarm.get(farm.farmId)}
+                periodLabel={`${MONTH_NAMES[month - 1]} ${year}`}
+              />
             ))}
           </div>
         )}

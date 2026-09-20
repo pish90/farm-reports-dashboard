@@ -3,8 +3,8 @@ import type {
   ExpenseCategoryDto, ExpenseListItemDto, FarmLiveStatusDto, FarmSummaryDto, MilkSummaryDto, PageDto, ReportDto,
 } from '../types';
 
-export async function getFarmSummaries(): Promise<FarmSummaryDto[]> {
-  const res = await client.get<{ data: FarmSummaryDto[] }>('/admin/farms');
+export async function getFarmSummaries(year?: number, month?: number): Promise<FarmSummaryDto[]> {
+  const res = await client.get<{ data: FarmSummaryDto[] }>('/admin/farms', { params: { year, month } });
   return res.data.data;
 }
 
