@@ -2,118 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCasualLabourers } from '../api/casual';
 import {
   checkCasualSheets, saveCasualSheets, scanCasualSheetPage,
-  type CheckSheetResult, type NameMatch, type SaveResult, type ScanPageResult,
+  type CheckSheetResult, type SaveResult,
 } from '../api/casualSheets';
 import { useFarmScope } from '../auth/useFarmScope';
 import Modal from '../components/Modal';
+import {
+  NEW, buildSheets, fileHash, repeatedSheets, rowProblem, type EditRow, type EditSheet, type Page,
+} from './casualSheetLogic';
 import type { CasualLabourerDto } from '../types';
 
 const inputClass =
   'border border-gray-300 rounded-md px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500';
 const PARALLEL_READS = 3;
-const NEW = 'new';
-
-type PageStatus = 'queued' | 'reading' | 'done' | 'error';
-
-interface Page {
-  id: string;
-  file: File;
-  url: string;
-  status: PageStatus;
-  error?: string;
-  result?: ScanPageResult;
-}
-
-interface EditRow {
-  id: string;
-  pageId: string;
-  lineNo: number | null;
-  nameAsWritten: string;
-  /** employee id as string, NEW for "add as new casual", '' for not chosen yet */
-  choice: string;
-  newFirst: string;
-  newLast: string;
-  amount: string;
-  rawAmount: string;
-  daysWorked: string;
-  signMark: string;
-  paid: boolean;
-  include: boolean;
-  uncertain: boolean;
-  uncertainReason: string;
-  candidates: NameMatch[];
-}
-
-interface EditSheet {
-  key: string;
-  activity: string;
-  periodText: string;
-  date: string;
-  ratePerDay: number | null;
-  pageIds: string[];
-  writtenTotals: number[];
-  notes: string[];
-  rows: EditRow[];
-}
 
 const ksh = (n: number) => n.toLocaleString('en-KE', { maximumFractionDigits: 2 });
 
-/** Pages are grouped into sheets in upload order: a page with a heading starts a sheet, pages without one continue it. */
-function buildSheets(pages: Page[]): EditSheet[] {
-  const sheets: EditSheet[] = [];
-  for (const p of pages) {
-    const r = p.result;
-    if (!r || !r.isCasualPaySheet) continue;
-    let sheet = sheets[sheets.length - 1];
-    if (r.heading.present || !sheet) {
-      sheet = {
-        key: `s${sheets.length + 1}`,
-        activity: r.heading.activity,
-        periodText: r.heading.periodText,
-        date: r.heading.endDate ?? r.heading.startDate ?? '',
-        ratePerDay: r.heading.ratePerDay,
-        pageIds: [],
-        writtenTotals: [],
-        notes: [],
-        rows: [],
-      };
-      sheets.push(sheet);
-    }
-    sheet.pageIds.push(p.id);
-    if (r.writtenTotal != null) sheet.writtenTotals.push(r.writtenTotal);
-    if (r.notes) sheet.notes.push(`${p.file.name}: ${r.notes}`);
-    r.rows.forEach((row, i) => {
-      sheet.rows.push({
-        id: `${p.id}-${i}`,
-        pageId: p.id,
-        lineNo: row.lineNo,
-        nameAsWritten: row.nameAsWritten,
-        choice: row.matchedEmployeeId != null ? String(row.matchedEmployeeId) : '',
-        newFirst: row.suggestedFirstName,
-        newLast: row.suggestedLastName,
-        amount: row.netAmount != null ? String(row.netAmount) : '',
-        rawAmount: row.rawAmount,
-        daysWorked: row.daysWorked,
-        signMark: row.signMark,
-        paid: row.paid,
-        include: row.netAmount != null && row.netAmount > 0,
-        uncertain: row.uncertain,
-        uncertainReason: row.uncertainReason,
-        candidates: row.candidates,
-      });
-    });
-  }
-  return sheets;
-}
-
-function rowProblem(row: EditRow): string | null {
-  if (!row.include) return null;
-  const amount = Number(row.amount);
-  if (!row.amount || !Number.isFinite(amount) || amount <= 0) return 'Enter the amount';
-  if (!row.choice) return 'Choose who this is';
-  if (row.choice === NEW && !row.newFirst.trim()) return 'Enter the new casual’s first name';
-  return null;
-}
 
 export default function CasualSheetScanner() {
   const { farms, farmId, setFarmId, multiFarm } = useFarmScope();
@@ -125,6 +28,7 @@ export default function CasualSheetScanner() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SaveResult | null>(null);
+  const [skipped, setSkipped] = useState<string[]>([]);
   const pagesRef = useRef<Page[]>([]);
   pagesRef.current = pages;
   const checksRef = useRef<Record<string, CheckSheetResult>>({});
@@ -147,21 +51,35 @@ export default function CasualSheetScanner() {
     setSheets(null);
     setChecks({});
     checksRef.current = {};
+    setSkipped([]);
     setError(null);
   }
 
-  function addFiles(list: FileList | null) {
+  async function addFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
     setSaved(null);
     setSheets(null);
-    const added: Page[] = Array.from(list)
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
-      .map((file, i) => ({
+    const files = Array.from(list).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    const hashes = await Promise.all(files.map(fileHash));
+    const known = new Map(pagesRef.current.map((p) => [p.hash, p.file.name]));
+    const added: Page[] = [];
+    const skippedNow: string[] = [];
+    files.forEach((file, i) => {
+      const earlier = known.get(hashes[i]);
+      if (earlier) {
+        skippedNow.push(earlier === file.name ? file.name : `${file.name} (same as ${earlier})`);
+        return;
+      }
+      known.set(hashes[i], file.name);
+      added.push({
         id: `p${Date.now()}-${i}`,
         file,
+        hash: hashes[i],
         url: URL.createObjectURL(file),
-        status: 'queued' as PageStatus,
-      }));
+        status: 'queued',
+      });
+    });
+    setSkipped(skippedNow);
     setPages((prev) => [...prev, ...added]);
   }
 
@@ -236,6 +154,10 @@ export default function CasualSheetScanner() {
     })));
   }
 
+  const repeats = useMemo(() => (sheets ? repeatedSheets(sheets) : {}), [sheets]);
+
+  const needsConfirm = (s: EditSheet) => !!checks[s.key]?.duplicateSheet || s.key in repeats;
+
   const problems = useMemo(() => {
     if (!sheets) return [];
     const out: string[] = [];
@@ -246,9 +168,12 @@ export default function CasualSheetScanner() {
       if (!s.activity.trim()) out.push(`Sheet ${i + 1}: enter the activity`);
       const bad = included.filter((r) => rowProblem(r)).length;
       if (bad > 0) out.push(`Sheet ${i + 1}: ${bad} row(s) need attention`);
+      if ((checks[s.key]?.duplicateSheet || s.key in repeats) && !s.confirmDuplicate) {
+        out.push(`Sheet ${i + 1}: looks like a repeat — confirm or untick its rows`);
+      }
     });
     return out;
-  }, [sheets]);
+  }, [sheets, checks, repeats]);
 
   async function save() {
     if (!sheets || !farmId) return;
@@ -261,6 +186,7 @@ export default function CasualSheetScanner() {
           periodText: s.periodText.trim(),
           date: s.date,
           ratePerDay: s.ratePerDay,
+          confirmDuplicate: s.confirmDuplicate,
           rows: s.rows.filter((r) => r.include).map((r) => ({
             employeeId: r.choice === NEW ? null : Number(r.choice),
             newFirstName: r.choice === NEW ? r.newFirst.trim() : null,
@@ -332,6 +258,12 @@ export default function CasualSheetScanner() {
         )}
       </div>
 
+      {skipped.length > 0 && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-800">
+          Skipped {skipped.length} photo(s) already added: {skipped.join(', ')}.
+        </div>
+      )}
+
       {saved && (
         <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
           Saved {saved.sheetsSaved} sheet(s): {saved.entriesSaved} casual(s) earned KSh {ksh(saved.totalEarned)},
@@ -383,7 +315,8 @@ export default function CasualSheetScanner() {
         const check = checks[sheet.key];
         const imported = new Set(check?.alreadyImportedEmployeeIds ?? []);
         const includedTotal = sheet.rows.filter((r) => r.include).reduce((t, r) => t + (Number(r.amount) || 0), 0);
-        const readTotal = sheet.rows.reduce((t, r) => t + (Number(r.amount) || 0), 0);
+        const readTotal = sheet.rows.filter((r) => !r.repeatOf).reduce((t, r) => t + (Number(r.amount) || 0), 0);
+        const repeatPhotos = [...new Set(sheet.rows.filter((r) => r.repeatOf).map((r) => r.repeatOf))];
         const writtenTotal = sheet.writtenTotals.reduce((t, n) => t + n, 0);
         return (
           <div key={sheet.key} className="border border-gray-200 rounded-xl overflow-hidden">
@@ -410,9 +343,24 @@ export default function CasualSheetScanner() {
                   ))}
                 </div>
               </div>
-              {check?.duplicateSheet && (
-                <div className="text-xs text-red-700">
-                  A session with this activity and date is already saved for this farm — this sheet may have been saved before.
+              {needsConfirm(sheet) && sheet.rows.some((r) => r.include) && (
+                <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800 space-y-1">
+                  <div>
+                    {check?.duplicateSheet
+                      ? 'A sheet with this activity and date is already saved for this farm — saving it again would pay everyone on it twice.'
+                      : `This has the same activity and date as Sheet ${repeats[sheet.key]} in this upload — it may be the same sheet photographed twice.`}
+                    {' '}Untick its rows if it’s a repeat.
+                  </div>
+                  <label className="flex items-center gap-2 font-medium">
+                    <input type="checkbox" checked={sheet.confirmDuplicate}
+                      onChange={(e) => updateSheet(sheet.key, { confirmDuplicate: e.target.checked })} />
+                    This is a different sheet — save it anyway
+                  </label>
+                </div>
+              )}
+              {repeatPhotos.length > 0 && (
+                <div className="text-xs text-amber-700">
+                  Some pages repeat an earlier photo ({repeatPhotos.join(', ')}). Their rows have been unticked and left out of the totals.
                 </div>
               )}
               {imported.size > 0 && (
@@ -451,6 +399,7 @@ export default function CasualSheetScanner() {
                         <td className="px-2 py-1.5 text-gray-500">{row.lineNo ?? ''}</td>
                         <td className="px-2 py-1.5">
                           <div className="font-medium text-gray-800">{row.nameAsWritten || '—'}</div>
+                          {row.repeatOf && <div className="text-xs text-amber-700">Repeat of photo {row.repeatOf}</div>}
                           {row.uncertain && <div className="text-xs text-amber-700">Check: {row.uncertainReason || 'hard to read'}</div>}
                           {alreadyImported && <div className="text-xs text-amber-700">Already in the monthly spreadsheet for this month</div>}
                           {row.include && problem && <div className="text-xs text-red-600">{problem}</div>}

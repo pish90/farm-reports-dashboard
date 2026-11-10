@@ -66,6 +66,8 @@ export interface SaveSheet {
   date: string;
   ratePerDay: number | null;
   rows: SaveRow[];
+  /** Confirmed it's a different sheet even though it looks like one already saved / repeated in this upload. */
+  confirmDuplicate: boolean;
 }
 
 export interface SaveResult {
