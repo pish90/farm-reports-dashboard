@@ -3,11 +3,12 @@ import {
   downloadImportTemplate, importCasualPay, importEmployeePay, importEmployees, importExpenses, importLivestock, importMilk,
 } from '../api/employees';
 import type { EmployeeCsvImportResult, ImportResult } from '../types';
+import CasualSheetScanner from './CasualSheetScanner';
 
 const selectClass =
   'border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500';
 
-type ImportKind = 'employees' | 'livestock' | 'milk' | 'employeePay' | 'casualPay' | 'expenses';
+type ImportKind = 'employees' | 'livestock' | 'milk' | 'employeePay' | 'casualPay' | 'casualSheets' | 'expenses';
 type YearMode = 'none' | 'single' | 'startYearMonth';
 
 const currentYear = new Date().getFullYear();
@@ -23,6 +24,7 @@ const TABS: { key: ImportKind; label: string; accept: string; yearMode: YearMode
   { key: 'milk', label: 'Milk Production', accept: '.xlsx', yearMode: 'single' },
   { key: 'employeePay', label: 'Employee Pay', accept: '.xlsx', yearMode: 'startYearMonth' },
   { key: 'casualPay', label: 'Casual Pay', accept: '.xlsx', yearMode: 'single' },
+  { key: 'casualSheets', label: 'Scan Casual Sheets', accept: 'image/*', yearMode: 'none' },
   { key: 'expenses', label: 'Expenses', accept: '.csv,.xlsx', yearMode: 'none' },
 ];
 
@@ -92,6 +94,7 @@ export default function BulkImportPage() {
     setTemplateBusy(true);
     setError(null);
     try {
+      if (tab === 'casualSheets') return;
       await downloadImportTemplate(tab);
     } catch {
       setError('Could not download the template. Please try again.');
@@ -129,7 +132,7 @@ export default function BulkImportPage() {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden max-w-3xl">
+    <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden ${tab === 'casualSheets' ? 'max-w-6xl' : 'max-w-3xl'}`}>
       <div className="px-5 pt-4 flex gap-1 border-b border-gray-200">
         {TABS.map((t) => (
           <button
@@ -146,6 +149,13 @@ export default function BulkImportPage() {
         ))}
       </div>
 
+      {tab === 'casualSheets' && (
+        <div className="p-5">
+          <CasualSheetScanner />
+        </div>
+      )}
+
+      {tab !== 'casualSheets' && (<>
       <div className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <p className="text-sm text-gray-500">
@@ -222,6 +232,7 @@ export default function BulkImportPage() {
           {busy ? 'Importing…' : 'Import'}
         </button>
       </div>
+      </>)}
     </div>
   );
 }
