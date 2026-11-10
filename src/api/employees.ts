@@ -110,6 +110,16 @@ export async function importEmployeePay(file: File, startYear: number, startMont
   return res.data.data;
 }
 
+export async function importCasualPay(file: File, year: number): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await client.post<{ data: ImportResult }>('/admin/casual-pay/import', formData, {
+    params: { year },
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.data;
+}
+
 export async function importExpenses(file: File): Promise<ImportResult> {
   const formData = new FormData();
   formData.append('file', file);
@@ -119,15 +129,18 @@ export async function importExpenses(file: File): Promise<ImportResult> {
   return res.data.data;
 }
 
-const IMPORT_TEMPLATE_PATHS: Record<'employees' | 'livestock' | 'milk' | 'employeePay' | 'expenses', { path: string; filename: string }> = {
+export type ImportTemplateKind = 'employees' | 'livestock' | 'milk' | 'employeePay' | 'casualPay' | 'expenses';
+
+const IMPORT_TEMPLATE_PATHS: Record<ImportTemplateKind, { path: string; filename: string }> = {
   employees: { path: '/admin/employees/import/template', filename: 'employee_import_template.xlsx' },
   livestock: { path: '/admin/livestock/import/template', filename: 'livestock_import_template.xlsx' },
   milk: { path: '/admin/milk/import/template', filename: 'milk_import_template.xlsx' },
   employeePay: { path: '/admin/employee-pay/import/template', filename: 'employee_pay_import_template.xlsx' },
+  casualPay: { path: '/admin/casual-pay/import/template', filename: 'casual_pay_import_template.xlsx' },
   expenses: { path: '/admin/expenses/import/template', filename: 'expenses_import_template.xlsx' },
 };
 
-export async function downloadImportTemplate(kind: 'employees' | 'livestock' | 'milk' | 'employeePay' | 'expenses'): Promise<void> {
+export async function downloadImportTemplate(kind: ImportTemplateKind): Promise<void> {
   const { path, filename } = IMPORT_TEMPLATE_PATHS[kind];
   const res = await client.get(path, { responseType: 'blob' });
   const url = URL.createObjectURL(res.data as Blob);

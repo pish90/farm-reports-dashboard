@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import {
-  downloadImportTemplate, importEmployeePay, importEmployees, importExpenses, importLivestock, importMilk,
+  downloadImportTemplate, importCasualPay, importEmployeePay, importEmployees, importExpenses, importLivestock, importMilk,
 } from '../api/employees';
 import type { EmployeeCsvImportResult, ImportResult } from '../types';
 
 const selectClass =
   'border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500';
 
-type ImportKind = 'employees' | 'livestock' | 'milk' | 'employeePay' | 'expenses';
+type ImportKind = 'employees' | 'livestock' | 'milk' | 'employeePay' | 'casualPay' | 'expenses';
 type YearMode = 'none' | 'single' | 'startYearMonth';
 
 const currentYear = new Date().getFullYear();
@@ -22,6 +22,7 @@ const TABS: { key: ImportKind; label: string; accept: string; yearMode: YearMode
   { key: 'livestock', label: 'Livestock', accept: '.xlsx', yearMode: 'single' },
   { key: 'milk', label: 'Milk Production', accept: '.xlsx', yearMode: 'single' },
   { key: 'employeePay', label: 'Employee Pay', accept: '.xlsx', yearMode: 'startYearMonth' },
+  { key: 'casualPay', label: 'Casual Pay', accept: '.xlsx', yearMode: 'single' },
   { key: 'expenses', label: 'Expenses', accept: '.csv,.xlsx', yearMode: 'none' },
 ];
 
@@ -114,6 +115,8 @@ export default function BulkImportPage() {
         res = await importMilk(file, year);
       } else if (tab === 'employeePay') {
         res = await importEmployeePay(file, startYear, startMonth);
+      } else if (tab === 'casualPay') {
+        res = await importCasualPay(file, year);
       } else {
         res = await importExpenses(file);
       }
@@ -154,6 +157,8 @@ export default function BulkImportPage() {
               'Upload the Milk_import_template (.xlsx). The file has no year column, so pick the year these figures belong to.'}
             {tab === 'employeePay' &&
               'Upload the Employee pay_import sheet (.xlsx) — one row per month, Earned/Paid per employee (by LS number). The file has no year column and month labels repeat, so pick the year and month the FIRST row represents; later rows are assumed to follow in sequence.'}
+            {tab === 'casualPay' &&
+              'Upload the casual_pay_import_template (.xlsx): one Earned row and one Paid row per employee, months Jan–Dec across the top. The Farm column is optional (needed only when a name exists on two farms). The file has no year column, so pick the year these figures belong to. Re-uploading replaces the figures from the previous upload for the same employee and month; blank months are left unchanged. Employees who are also salaried go to Payroll, as with Employee Pay.'}
             {tab === 'expenses' &&
               'Upload the expenses_import_template (.csv or .xlsx). Columns: farm, date, ID, supplier, product/service, category, amount. ID is your own receipt/voucher number, per farm, and doubles as the amend key: a new ID is added as a new expense, and an ID already on file is updated in place with this row\'s values (re-uploading the template with corrected figures is how you amend previously-imported expenses). An unrecognized category is imported blank rather than erroring.'}
           </p>
