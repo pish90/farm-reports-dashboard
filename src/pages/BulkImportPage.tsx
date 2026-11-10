@@ -9,20 +9,16 @@ const selectClass =
   'border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500';
 
 type ImportKind = 'employees' | 'livestock' | 'milk' | 'employeePay' | 'casualPay' | 'casualSheets' | 'expenses';
-type YearMode = 'none' | 'single' | 'startYearMonth';
+type YearMode = 'none' | 'single';
 
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
 
 const TABS: { key: ImportKind; label: string; accept: string; yearMode: YearMode }[] = [
   { key: 'employees', label: 'Employees', accept: '.csv,.xlsx', yearMode: 'none' },
   { key: 'livestock', label: 'Livestock', accept: '.xlsx', yearMode: 'single' },
   { key: 'milk', label: 'Milk Production', accept: '.xlsx', yearMode: 'single' },
-  { key: 'employeePay', label: 'Employee Pay', accept: '.xlsx', yearMode: 'startYearMonth' },
+  { key: 'employeePay', label: 'Employee Pay', accept: '.xlsx', yearMode: 'single' },
   { key: 'casualPay', label: 'Casual Pay', accept: '.xlsx', yearMode: 'single' },
   { key: 'casualSheets', label: 'Scan Casual Sheets', accept: 'image/*', yearMode: 'none' },
   { key: 'expenses', label: 'Expenses', accept: '.csv,.xlsx', yearMode: 'none' },
@@ -74,8 +70,6 @@ export default function BulkImportPage() {
   const [tab, setTab] = useState<ImportKind>('employees');
   const [file, setFile] = useState<File | null>(null);
   const [year, setYear] = useState(currentYear);
-  const [startYear, setStartYear] = useState(currentYear);
-  const [startMonth, setStartMonth] = useState(1);
   const [busy, setBusy] = useState(false);
   const [templateBusy, setTemplateBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +111,8 @@ export default function BulkImportPage() {
       } else if (tab === 'milk') {
         res = await importMilk(file, year);
       } else if (tab === 'employeePay') {
-        res = await importEmployeePay(file, startYear, startMonth);
+        // startMonth only applies to the old one-row-per-month layout, read as starting in January
+        res = await importEmployeePay(file, year, 1);
       } else if (tab === 'casualPay') {
         res = await importCasualPay(file, year);
       } else {
@@ -166,7 +161,7 @@ export default function BulkImportPage() {
             {tab === 'milk' &&
               'Upload the Milk_import_template (.xlsx). The file has no year column, so pick the year these figures belong to.'}
             {tab === 'employeePay' &&
-              'Upload the Employee pay_import sheet (.xlsx) — one row per month, Earned/Paid per employee (by LS number). The file has no year column and month labels repeat, so pick the year and month the FIRST row represents; later rows are assumed to follow in sequence.'}
+              'Upload the employee_pay_import_template (.xlsx): one Earned row and one Paid row per employee, months Jan–Dec across the top — the same layout as Casual Pay. The Farm column is optional (needed only when a name exists on two farms). The file has no year column, so pick the year these figures belong to. Earned updates the payroll gross salary; Paid updates the payroll amount paid and the payment ledger. Re-uploading replaces the figures from the previous upload for the same employee and month; blank months are left unchanged.'}
             {tab === 'casualPay' &&
               'Upload the casual_pay_import_template (.xlsx): one Earned row and one Paid row per employee, months Jan–Dec across the top. The Farm column is optional (needed only when a name exists on two farms). The file has no year column, so pick the year these figures belong to. Re-uploading replaces the figures from the previous upload for the same employee and month; blank months are left unchanged. Employees who are also salaried go to Payroll, as with Employee Pay.'}
             {tab === 'expenses' &&
@@ -185,24 +180,6 @@ export default function BulkImportPage() {
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Year</label>
             <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={selectClass}>
-              {YEAR_OPTIONS.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {activeTab.yearMode === 'startYearMonth' && (
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">First row is</label>
-              <select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className={selectClass}>
-                {MONTH_NAMES.map((name, idx) => (
-                  <option key={idx + 1} value={idx + 1}>{name}</option>
-                ))}
-              </select>
-            </div>
-            <select value={startYear} onChange={(e) => setStartYear(Number(e.target.value))} className={selectClass}>
               {YEAR_OPTIONS.map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
